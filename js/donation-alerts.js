@@ -97,7 +97,7 @@
     }
 
     console.warn("DonationAlerts donation received:", donation);
-    window.handleDonation(donation.amount);
+    window.handleDonation(donation);
   }
 
   async function subscribeDonationAlertsChannel(settings, channel, clientId) {

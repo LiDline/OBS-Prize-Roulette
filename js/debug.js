@@ -15,7 +15,10 @@
     state.elements.debugPanel.classList.add("is-enabled");
     state.elements.oddsOutput.textContent = formatOdds();
     state.elements.simulateDonationButton.addEventListener("click", function () {
-      window.handleDonation(state.elements.donationAmount.value);
+      window.handleDonation({
+        amount: state.elements.donationAmount.value,
+        username: "testName"
+      });
     });
   }
 

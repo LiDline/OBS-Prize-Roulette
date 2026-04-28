@@ -14,22 +14,39 @@
     return app.roulette.startRoulette();
   };
 
-  window.handleDonation = function (amount) {
-    var numericAmount = Number(amount);
+  window.handleDonation = function (donation) {
+    var donationData = normalizeDonation(donation);
+    var numericAmount = donationData.amount;
     var threshold = Number(state.config.donationThreshold) || 0;
 
     if (!Number.isFinite(numericAmount)) {
-      console.warn("Donation amount is not a valid number:", amount);
+      console.warn("Donation amount is not a valid number:", donation);
       return false;
     }
 
     if (numericAmount >= threshold) {
-      return app.roulette.startRoulette();
+      return app.roulette.startRoulette({
+        donorName: donationData.username
+      });
     }
 
     console.warn("Donation below threshold:", numericAmount, "required:", threshold);
     return false;
   };
+
+  function normalizeDonation(donation) {
+    if (donation && typeof donation === "object") {
+      return {
+        amount: Number(donation.amount),
+        username: donation.username || donation.name || ""
+      };
+    }
+
+    return {
+      amount: Number(donation),
+      username: ""
+    };
+  }
 
   async function init() {
     cacheElements();
@@ -41,6 +58,7 @@
 
   function cacheElements() {
     state.elements.overlay = document.getElementById("rouletteOverlay");
+    state.elements.title = document.getElementById("rouletteTitle");
     state.elements.track = document.getElementById("reelTrack");
     state.elements.resultPanel = document.getElementById("resultPanel");
     state.elements.resultName = document.getElementById("resultName");

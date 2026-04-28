@@ -6,6 +6,7 @@
     config: window.RouletteApp.config.fallbackConfig,
     isSpinning: false,
     queuedSpins: 0,
+    queuedSpinContexts: [],
     elements: {},
     itemWidth: 238,
     donationAlerts: {

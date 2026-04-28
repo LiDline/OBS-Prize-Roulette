@@ -80,6 +80,7 @@ function createElement(tagName) {
 function createDocument() {
   const elements = {
     rouletteOverlay: createElement("div"),
+    rouletteTitle: createElement("div"),
     reelTrack: createElement("div"),
     resultPanel: createElement("div"),
     resultName: createElement("span")
@@ -169,6 +170,7 @@ function loadRoulette(options) {
   });
 
   context.window.RouletteApp.state.elements.overlay = document.getElementById("rouletteOverlay");
+  context.window.RouletteApp.state.elements.title = document.getElementById("rouletteTitle");
   context.window.RouletteApp.state.elements.track = document.getElementById("reelTrack");
   context.window.RouletteApp.state.elements.resultPanel = document.getElementById("resultPanel");
   context.window.RouletteApp.state.elements.resultName = document.getElementById("resultName");
@@ -286,6 +288,29 @@ assert.ok(
 );
 
 loaded.context.runTimers();
+
+const donorLoaded = loadRoulette();
+donorLoaded.app.state.config = Object.assign({}, donorLoaded.app.state.config, {
+  prizes: [
+    { id: 1, name: "Донатный приз", weight: 1 }
+  ],
+  resultDisplayMs: 0,
+  closeDelayMs: 0
+});
+
+assert.strictEqual(
+  donorLoaded.app.roulette.startRoulette({ donorName: "testName" }),
+  true,
+  "spin starts with donor context"
+);
+
+donorLoaded.context.runTimers();
+
+assert.strictEqual(
+  donorLoaded.app.state.elements.title.textContent,
+  "Рулетка призов для testName",
+  "roulette title shows donor name"
+);
 
 loaded.app.state.config = Object.assign({}, loaded.app.state.config, {
   resultDisplayMs: 0,

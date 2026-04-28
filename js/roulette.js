@@ -7,9 +7,12 @@
   var readCssPixels = app.utils.readCssPixels;
   var safePlaySound = app.utils.safePlaySound;
 
-  function startRoulette() {
+  function startRoulette(spinContext) {
+    spinContext = normalizeSpinContext(spinContext);
+
     if (state.isSpinning) {
       state.queuedSpins += 1;
+      state.queuedSpinContexts.push(spinContext);
       console.warn("Roulette is already active. Spin queued:", state.queuedSpins);
       return true;
     }
@@ -23,6 +26,7 @@
 
     state.isSpinning = true;
     resetResult();
+    updateTitle(spinContext);
     safePlaySound(state.config.sounds && state.config.sounds.open);
     showOverlay();
 
@@ -31,7 +35,7 @@
 
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
-        spinToWinner(reel.winnerIndex, winner);
+        spinToWinner(reel.winnerIndex, winner, spinContext);
       });
     });
 
@@ -169,7 +173,19 @@
     return Array.isArray(uploadedImages) && uploadedImages.indexOf(imageSrc) !== -1;
   }
 
-  function spinToWinner(winnerIndex, winner) {
+  function normalizeSpinContext(spinContext) {
+    if (!spinContext || typeof spinContext !== "object") {
+      return {
+        donorName: ""
+      };
+    }
+
+    return {
+      donorName: spinContext.donorName || ""
+    };
+  }
+
+  function spinToWinner(winnerIndex, winner, spinContext) {
     var track = state.elements.track;
     var windowElement = track.parentElement;
     var cardWidth = readCssPixels("--card-width");
@@ -218,7 +234,7 @@
     }
 
     state.queuedSpins -= 1;
-    startRoulette();
+    startRoulette(state.queuedSpinContexts.shift());
   }
 
   function showOverlay() {
@@ -232,6 +248,18 @@
   function resetResult() {
     state.elements.resultPanel.classList.remove("is-visible");
     state.elements.resultName.textContent = "-";
+    updateTitle();
+  }
+
+  function updateTitle(spinContext) {
+    if (!state.elements.title) {
+      return;
+    }
+
+    var donorName = spinContext && spinContext.donorName;
+    state.elements.title.textContent = donorName
+      ? "Рулетка призов для " + donorName
+      : "Рулетка призов";
   }
 
   app.roulette = {

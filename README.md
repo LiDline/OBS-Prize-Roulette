@@ -108,9 +108,6 @@ node scripts/generate-uploaded-images-manifest.js
 Минимально нужен `accessToken`. Если `userId` и `socketConnectionToken` не
 заполнены, приложение попробует получить их через DonationAlerts API.
 
-Когда DonationAlerts присылает донат, сумма передается в `handleDonation`.
-Рулетка запускается только если сумма больше или равна `donationThreshold`.
-
 ## Структура проекта
 
 ```text
