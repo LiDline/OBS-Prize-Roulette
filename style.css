@@ -61,7 +61,7 @@ input {
 .roulette-stage {
   position: relative;
   width: 1240px;
-  padding: 36px 44px 34px;
+  padding: 25px 44px 34px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 8px;
   background:
@@ -73,9 +73,10 @@ input {
 }
 
 .roulette-title {
-  margin-bottom: 22px;
+  margin-bottom: 38px;
   text-align: center;
   font-size: 36px;
+  line-height: 1;
   font-weight: 800;
   letter-spacing: 0;
   text-shadow: 0 2px 18px rgba(0, 0, 0, 0.65);
