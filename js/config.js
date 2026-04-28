@@ -6,11 +6,7 @@
     spinDurationMs: 6000,
     resultDisplayMs: 3000,
     closeDelayMs: 800,
-    sounds: {
-      open: "assets/open.mp3",
-      close: "assets/close.mp3"
-    },
-    sound: "assets/common.mp3",
+    sound: "assets/card-change.mp3",
     donationAlerts: {
       accessToken: "",
       userId: "",
@@ -71,7 +67,6 @@
       spinDurationMs: readNumber(loadedConfig.spinDurationMs, defaultConfig.spinDurationMs),
       resultDisplayMs: readNumber(loadedConfig.resultDisplayMs, defaultConfig.resultDisplayMs),
       closeDelayMs: readNumber(loadedConfig.closeDelayMs, defaultConfig.closeDelayMs),
-      sounds: Object.assign({}, defaultConfig.sounds, loadedConfig.sounds || {}),
       sound: loadedConfig.sound || defaultConfig.sound,
       donationAlerts: Object.assign({}, defaultConfig.donationAlerts, loadedConfig.donationAlerts || {}),
       prizes: Array.isArray(loadedConfig.prizes) ? loadedConfig.prizes : defaultConfig.prizes

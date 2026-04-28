@@ -104,13 +104,23 @@ function loadRoulette(options) {
   options = options || {};
   const document = createDocument();
   const pendingTimers = [];
+  const pendingAnimationFrames = [];
+  const canceledAnimationFrames = new Set();
+  let nextAnimationFrameId = 1;
   const playedSounds = [];
   const context = {
     console,
     document,
     window: {},
     requestAnimationFrame: function (callback) {
-      callback();
+      const id = nextAnimationFrameId;
+
+      nextAnimationFrameId += 1;
+      pendingAnimationFrames.push({ id, callback });
+      return id;
+    },
+    cancelAnimationFrame: function (id) {
+      canceledAnimationFrames.add(id);
     },
     Audio: function Audio(src) {
       playedSounds.push(src);
@@ -126,6 +136,7 @@ function loadRoulette(options) {
     return pendingTimers.length;
   };
   context.window.requestAnimationFrame = context.requestAnimationFrame;
+  context.window.cancelAnimationFrame = context.cancelAnimationFrame;
   context.window.Math = Object.create(Math);
   context.window.Math.random = function () {
     return options.random ? options.random() : 0;
@@ -138,8 +149,10 @@ function loadRoulette(options) {
   context.window.RouletteApp.uploadedPrizeImages = [
     "uploads/Тестовый приз.png"
   ];
+  context.computedTransform = "none";
   context.window.getComputedStyle = function () {
     return {
+      transform: context.computedTransform,
       getPropertyValue: function (name) {
         if (name === "--card-width") {
           return "220px";
@@ -157,6 +170,19 @@ function loadRoulette(options) {
   context.runTimers = function () {
     while (pendingTimers.length) {
       pendingTimers.shift()();
+    }
+  };
+  context.runAnimationFrames = function (limit) {
+    let framesRun = 0;
+
+    while (pendingAnimationFrames.length && (limit === undefined || framesRun < limit)) {
+      const frame = pendingAnimationFrames.shift();
+
+      framesRun += 1;
+
+      if (!canceledAnimationFrames.has(frame.id)) {
+        frame.callback();
+      }
     }
   };
   context.playedSounds = playedSounds;
@@ -181,11 +207,18 @@ function loadRoulette(options) {
   };
 }
 
+function finishSpin(loaded) {
+  loaded.context.runAnimationFrames(2);
+  loaded.context.runTimers();
+  loaded.context.runAnimationFrames();
+}
+
 const loaded = loadRoulette();
 const roulette = loaded.app.roulette;
 
 assert.strictEqual(typeof roulette.calculatePrizeStopOffset, "function");
 assert.strictEqual(typeof roulette.buildReel, "function");
+assert.strictEqual(typeof roulette.calculateCardIndexFromTransform, "function");
 
 const cardWidth = 220;
 const edgePadding = 28;
@@ -201,6 +234,17 @@ for (let i = 0; i < attempts; i += 1) {
 }
 
 assert.ok(offsets.size > 1, "stop offset varies between spins");
+
+assert.strictEqual(
+  roulette.calculateCardIndexFromTransform("none", 238, 600),
+  1,
+  "active card index is derived from the centered card without transform"
+);
+assert.strictEqual(
+  roulette.calculateCardIndexFromTransform("matrix(1, 0, 0, 1, -238, 0)", 238, 600),
+  2,
+  "active card index advances when the reel moves by one item"
+);
 
 const shuffledLoaded = loadRoulette({
   random: (function () {
@@ -287,7 +331,7 @@ assert.ok(
   "card renders prize name immediately when image file is not listed"
 );
 
-loaded.context.runTimers();
+finishSpin(loaded);
 
 const donorLoaded = loadRoulette();
 donorLoaded.app.state.config = Object.assign({}, donorLoaded.app.state.config, {
@@ -304,7 +348,7 @@ assert.strictEqual(
   "spin starts with donor context"
 );
 
-donorLoaded.context.runTimers();
+finishSpin(donorLoaded);
 
 assert.strictEqual(
   donorLoaded.app.state.elements.title.textContent,
@@ -331,7 +375,7 @@ assert.strictEqual(
   "spin starts with donation spin counter"
 );
 
-donorCounterLoaded.context.runTimers();
+finishSpin(donorCounterLoaded);
 
 assert.strictEqual(
   donorCounterLoaded.app.state.elements.title.textContent,
@@ -341,22 +385,22 @@ assert.strictEqual(
 
 loaded.app.state.config = Object.assign({}, loaded.app.state.config, {
   resultDisplayMs: 0,
-  closeDelayMs: 0
+  closeDelayMs: 0,
+  sound: "assets/card-change.mp3"
 });
 
-const openSoundCountBeforeQueueTest = loaded.context.playedSounds.filter(function (src) {
-  return src === loaded.app.state.config.sounds.open;
-}).length;
+const soundCountBeforeCardChangeTest = loaded.context.playedSounds.length;
 
 assert.strictEqual(roulette.startRoulette(), true, "first spin starts immediately");
 assert.strictEqual(roulette.startRoulette(), true, "second spin is queued while first spin is active");
 
+loaded.context.runAnimationFrames(2);
+loaded.context.computedTransform = "matrix(1, 0, 0, 1, -238, 0)";
+loaded.context.runAnimationFrames(1);
 loaded.context.runTimers();
 
-assert.strictEqual(
-  loaded.context.playedSounds.filter(function (src) {
-    return src === loaded.app.state.config.sounds.open;
-  }).length - openSoundCountBeforeQueueTest,
-  2,
-  "queued spin starts after the active spin finishes"
+assert.deepStrictEqual(
+  loaded.context.playedSounds.slice(soundCountBeforeCardChangeTest),
+  ["assets/card-change.mp3"],
+  "only the shared sound plays when the active card changes"
 );

@@ -3,11 +3,7 @@
   "spinDurationMs": 6000,
   "resultDisplayMs": 3000,
   "closeDelayMs": 800,
-  "sounds": {
-    "open": "assets/open.mp3",
-    "close": "assets/close.mp3"
-  },
-  "sound": "assets/common.mp3",
+  "sound": "assets/card-change.mp3",
   "prizes": [
     {
       "id": 1,

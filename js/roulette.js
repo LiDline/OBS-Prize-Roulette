@@ -6,6 +6,8 @@
   var fallbackConfig = app.config.fallbackConfig;
   var readCssPixels = app.utils.readCssPixels;
   var safePlaySound = app.utils.safePlaySound;
+  var cardSoundAnimationFrame = null;
+  var lastSoundCardIndex = null;
 
   function startRoulette(spinContext) {
     spinContext = normalizeSpinContext(spinContext);
@@ -27,7 +29,6 @@
     state.isSpinning = true;
     resetResult();
     updateTitle(spinContext);
-    safePlaySound(state.config.sounds && state.config.sounds.open);
     showOverlay();
 
     var reel = buildReel(winner);
@@ -201,6 +202,7 @@
 
     track.style.transitionDuration = duration + "ms";
     track.classList.add("is-spinning");
+    startCardChangeSoundWatcher(track);
     track.style.transform = "translate3d(" + (finalX - stopOffset) + "px, 0, 0)";
 
     window.setTimeout(function () {
@@ -218,18 +220,82 @@
   }
 
   function showResult(winner) {
+    stopCardChangeSoundWatcher();
     state.elements.resultName.textContent = winner.name || "Приз";
     state.elements.resultPanel.classList.add("is-visible");
-    safePlaySound(state.config.sound || winner.sound);
 
     window.setTimeout(function () {
-      safePlaySound(state.config.sounds && state.config.sounds.close);
       window.setTimeout(function () {
         hideOverlay();
         state.isSpinning = false;
         startNextQueuedSpin();
       }, Math.max(0, Number(state.config.closeDelayMs) || 0));
     }, Math.max(0, Number(state.config.resultDisplayMs) || fallbackConfig.resultDisplayMs));
+  }
+
+  function startCardChangeSoundWatcher(track) {
+    stopCardChangeSoundWatcher();
+
+    lastSoundCardIndex = calculateCurrentCardIndex(track);
+    cardSoundAnimationFrame = window.requestAnimationFrame(function watchCardChange() {
+      var currentIndex = calculateCurrentCardIndex(track);
+
+      if (currentIndex !== lastSoundCardIndex) {
+        lastSoundCardIndex = currentIndex;
+        safePlaySound(state.config.sound);
+      }
+
+      if (state.isSpinning) {
+        cardSoundAnimationFrame = window.requestAnimationFrame(watchCardChange);
+      }
+    });
+  }
+
+  function stopCardChangeSoundWatcher() {
+    if (cardSoundAnimationFrame !== null && typeof window.cancelAnimationFrame === "function") {
+      window.cancelAnimationFrame(cardSoundAnimationFrame);
+    }
+
+    cardSoundAnimationFrame = null;
+    lastSoundCardIndex = null;
+  }
+
+  function calculateCurrentCardIndex(track) {
+    var windowElement = track.parentElement;
+    var transform = window.getComputedStyle(track).transform;
+    var windowWidth = windowElement ? windowElement.clientWidth : 0;
+
+    return calculateCardIndexFromTransform(transform, state.itemWidth, windowWidth);
+  }
+
+  function calculateCardIndexFromTransform(transform, itemWidth, windowWidth) {
+    var safeItemWidth = Math.max(1, Number(itemWidth) || 1);
+    var windowCenter = Math.max(0, Number(windowWidth) || 0) / 2;
+    var translateX = parseTranslateX(transform);
+
+    return Math.max(0, Math.floor((windowCenter - translateX) / safeItemWidth));
+  }
+
+  function parseTranslateX(transform) {
+    var matrixMatch;
+
+    if (!transform || transform === "none") {
+      return 0;
+    }
+
+    matrixMatch = transform.match(/^matrix\(([^)]+)\)$/);
+
+    if (matrixMatch) {
+      return Number(matrixMatch[1].split(",")[4]) || 0;
+    }
+
+    matrixMatch = transform.match(/^matrix3d\(([^)]+)\)$/);
+
+    if (matrixMatch) {
+      return Number(matrixMatch[1].split(",")[12]) || 0;
+    }
+
+    return 0;
   }
 
   function startNextQueuedSpin() {
@@ -268,7 +334,7 @@
       : "Рулетка призов";
 
     if (spinCount > 1 && spinIndex > 0) {
-      title += " - " + spinIndex + "/" + spinCount;
+      title += " · " + spinIndex + "/" + spinCount;
     }
 
     state.elements.title.textContent = title;
@@ -277,6 +343,7 @@
   app.roulette = {
     buildReel: buildReel,
     buildPrizeImageSrc: buildPrizeImageSrc,
+    calculateCardIndexFromTransform: calculateCardIndexFromTransform,
     calculatePrizeStopOffset: calculatePrizeStopOffset,
     pickWeightedPrize: pickWeightedPrize,
     startRoulette: startRoulette
