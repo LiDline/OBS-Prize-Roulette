@@ -33,9 +33,9 @@
 
   async function init() {
     cacheElements();
-    app.debug.setupPanel();
     state.config = await app.config.loadConfig();
     state.itemWidth = app.utils.readCssPixels("--card-width") + app.utils.readCssPixels("--card-gap");
+    app.debug.setupPanel();
     app.donationAlerts.init();
   }
 
@@ -45,9 +45,6 @@
     state.elements.resultPanel = document.getElementById("resultPanel");
     state.elements.resultName = document.getElementById("resultName");
     state.elements.debugPanel = document.getElementById("debugPanel");
-    state.elements.toggleDebugPanel = document.getElementById("toggleDebugPanel");
-    state.elements.testSpinButton = document.getElementById("testSpinButton");
-    state.elements.showOddsButton = document.getElementById("showOddsButton");
     state.elements.oddsOutput = document.getElementById("oddsOutput");
     state.elements.donationAmount = document.getElementById("donationAmount");
     state.elements.simulateDonationButton = document.getElementById("simulateDonationButton");

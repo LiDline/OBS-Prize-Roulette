@@ -14,15 +14,7 @@
     }
 
     state.elements.debugPanel.classList.add("is-enabled");
-    state.elements.toggleDebugPanel.addEventListener("click", function () {
-      state.elements.debugPanel.classList.toggle("is-collapsed");
-    });
-    state.elements.testSpinButton.addEventListener("click", function () {
-      window.testSpin();
-    });
-    state.elements.showOddsButton.addEventListener("click", function () {
-      state.elements.oddsOutput.textContent = formatOdds();
-    });
+    state.elements.oddsOutput.textContent = formatOdds();
     state.elements.simulateDonationButton.addEventListener("click", function () {
       window.handleDonation(state.elements.donationAmount.value);
     });

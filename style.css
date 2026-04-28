@@ -260,10 +260,6 @@ input {
   display: grid;
 }
 
-.debug-panel.is-collapsed > *:not(#toggleDebugPanel) {
-  display: none;
-}
-
 .debug-panel button,
 .debug-panel input {
   width: 100%;
