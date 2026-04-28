@@ -1,0 +1,46 @@
+(function (window) {
+  "use strict";
+
+  window.RouletteApp = window.RouletteApp || {};
+  window.RouletteApp.uploadedPrizeImages = [
+    "uploads/1 000 золотых орлов.png",
+    "uploads/10 000 золотых орлов.png",
+    "uploads/150 золотых орлов.png",
+    "uploads/180 дней прем аккаунта.png",
+    "uploads/2 500 золотых орлов.png",
+    "uploads/20 дней прем аккаунта.png",
+    "uploads/5 000 золотых орлов.png",
+    "uploads/60 дней прем аккаунта.png",
+    "uploads/AH-64A Apache.png",
+    "uploads/AH-64DJP.png",
+    "uploads/Alpha Jet A.png",
+    "uploads/CLOVIS.png",
+    "uploads/GBT155.png",
+    "uploads/L-39ZA Albatros.png",
+    "uploads/Leopard A1A1.png",
+    "uploads/Mustang.png",
+    "uploads/PzH 2000.png",
+    "uploads/RAH-66 Comanche.png",
+    "uploads/Tigre HAD-E.png",
+    "uploads/Type 16 (FPS).png",
+    "uploads/Type 61 (B).png",
+    "uploads/Type 74 Red Star.png",
+    "uploads/Wyvern.png",
+    "uploads/БМД-4М.png",
+    "uploads/ИС-6.png",
+    "uploads/Набор \"Ад на колёсах\".png",
+    "uploads/Набор \"В мае 45-го\".png",
+    "uploads/Набор \"Два фронта\".png",
+    "uploads/Объек 120.png",
+    "uploads/Стартовый набор Британии.png",
+    "uploads/Стартовый набор Италии.png",
+    "uploads/Стартовый набор Китая.png",
+    "uploads/Стартовый набор СССР.png",
+    "uploads/Стартовый набор США.png",
+    "uploads/Стартовый набор Франции.png",
+    "uploads/Стартовый набор Швеции.png",
+    "uploads/Стартовый набор Японии.png",
+    "uploads/Су-25K.png",
+    "uploads/Эхо Оверлорда.png"
+  ];
+}(window));

@@ -129,6 +129,9 @@ function loadRoulette() {
     return 0;
   };
   context.window.RouletteApp = {};
+  context.window.RouletteApp.uploadedPrizeImages = [
+    "uploads/Тестовый приз.png"
+  ];
   context.window.getComputedStyle = function () {
     return {
       getPropertyValue: function (name) {
@@ -200,7 +203,7 @@ loaded.app.state.config = Object.assign({}, loaded.app.state.config, {
   closeDelayMs: 0
 });
 
-assert.strictEqual(roulette.startRoulette(), true, "spin starts with generated prize image");
+assert.strictEqual(roulette.startRoulette(), true, "spin starts with available prize image");
 
 const firstCard = loaded.app.state.elements.track.children[0];
 const firstImage = firstCard.children.find(function (child) {
@@ -208,7 +211,7 @@ const firstImage = firstCard.children.find(function (child) {
 });
 
 assert.ok(firstImage, "card includes an image");
-assert.strictEqual(firstImage.src, "uploads/Тестовый приз.png", "image path is derived from prize name");
+assert.strictEqual(firstImage.src, "uploads/Тестовый приз.png", "image path is derived from prize name when file is listed");
 assert.strictEqual(firstImage.alt, "Тестовый приз", "image alt uses prize name");
 
 firstImage.onerror();
@@ -218,6 +221,19 @@ assert.ok(
     return child.className === "prize-name" && child.textContent === "Тестовый приз";
   }),
   "card falls back to prize name when image is missing"
+);
+
+const secondCard = loaded.app.state.elements.track.children[1];
+const secondImage = secondCard.children.find(function (child) {
+  return child.tagName === "img";
+});
+
+assert.strictEqual(secondImage, undefined, "card does not request an image when file is not listed");
+assert.ok(
+  secondCard.children.some(function (child) {
+    return child.className === "prize-name" && child.textContent === "Текстовый приз";
+  }),
+  "card renders prize name immediately when image file is not listed"
 );
 
 loaded.context.runTimers();

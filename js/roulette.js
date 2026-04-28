@@ -112,10 +112,17 @@
 
   function renderPrizeCardContent(card, prize) {
     var prizeName = prize.name || "Приз";
+    var imageSrc = buildPrizeImageSrc(prizeName);
+
+    if (!hasAvailablePrizeImage(imageSrc)) {
+      appendPrizeName(card, prizeName);
+      return;
+    }
+
     var image = document.createElement("img");
 
     image.className = "prize-image";
-    image.src = buildPrizeImageSrc(prizeName);
+    image.src = imageSrc;
     image.alt = prizeName;
     image.onerror = function () {
       image.onerror = null;
@@ -136,6 +143,12 @@
 
   function buildPrizeImageSrc(prizeName) {
     return "uploads/" + prizeName + ".png";
+  }
+
+  function hasAvailablePrizeImage(imageSrc) {
+    var uploadedImages = app.uploadedPrizeImages;
+
+    return Array.isArray(uploadedImages) && uploadedImages.indexOf(imageSrc) !== -1;
   }
 
   function spinToWinner(winnerIndex, winner) {
