@@ -117,18 +117,29 @@
   function spinToWinner(winnerIndex, winner) {
     var track = state.elements.track;
     var windowElement = track.parentElement;
+    var cardWidth = readCssPixels("--card-width");
     var windowCenter = windowElement.clientWidth / 2;
-    var cardCenter = winnerIndex * state.itemWidth + readCssPixels("--card-width") / 2;
+    var cardCenter = winnerIndex * state.itemWidth + cardWidth / 2;
+    var stopOffset = calculatePrizeStopOffset(cardWidth);
     var finalX = windowCenter - cardCenter;
     var duration = Math.max(1000, Number(state.config.spinDurationMs) || fallbackConfig.spinDurationMs);
 
     track.style.transitionDuration = duration + "ms";
     track.classList.add("is-spinning");
-    track.style.transform = "translate3d(" + finalX + "px, 0, 0)";
+    track.style.transform = "translate3d(" + (finalX - stopOffset) + "px, 0, 0)";
 
     window.setTimeout(function () {
       showResult(winner);
     }, duration + 80);
+  }
+
+  function calculatePrizeStopOffset(cardWidth) {
+    var safeCardWidth = Math.max(0, Number(cardWidth) || 0);
+    var edgePadding = Math.min(28, safeCardWidth / 2);
+    var minOffset = -safeCardWidth / 2 + edgePadding;
+    var maxOffset = safeCardWidth / 2 - edgePadding;
+
+    return minOffset + Math.random() * (maxOffset - minOffset);
   }
 
   function showResult(winner) {
@@ -159,6 +170,7 @@
   }
 
   app.roulette = {
+    calculatePrizeStopOffset: calculatePrizeStopOffset,
     pickWeightedPrize: pickWeightedPrize,
     startRoulette: startRoulette
   };
