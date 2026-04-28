@@ -32,6 +32,7 @@ http://localhost:8000/?debug=1
 ```
 
 Пример:
+
 ![alt text](image.png)
 
 ## Настройка
