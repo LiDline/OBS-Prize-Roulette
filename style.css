@@ -1,0 +1,308 @@
+:root {
+  --scene-width: 1920px;
+  --scene-height: 1080px;
+  --card-width: 220px;
+  --card-height: 150px;
+  --card-gap: 18px;
+  --ease-spin: cubic-bezier(0.12, 0.78, 0.08, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #fff;
+}
+
+body {
+  min-width: var(--scene-width);
+  min-height: var(--scene-height);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.roulette-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(22px) scale(0.98);
+  transition:
+    opacity 420ms ease,
+    transform 420ms ease,
+    visibility 0s linear 420ms;
+}
+
+.roulette-overlay.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity 420ms ease,
+    transform 420ms ease,
+    visibility 0s linear 0s;
+}
+
+.roulette-stage {
+  position: relative;
+  width: 1240px;
+  padding: 36px 44px 34px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(18, 22, 34, 0.88), rgba(9, 11, 18, 0.9)),
+    rgba(10, 12, 20, 0.86);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.42),
+    inset 0 0 40px rgba(255, 255, 255, 0.04);
+}
+
+.roulette-title {
+  margin-bottom: 22px;
+  text-align: center;
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.65);
+}
+
+.pointer {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 86px;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: 18px solid transparent;
+  border-right: 18px solid transparent;
+  border-top: 30px solid #ffffff;
+  filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.9));
+}
+
+.pointer::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  top: 24px;
+  width: 4px;
+  height: 190px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.75);
+}
+
+.reel-window {
+  position: relative;
+  width: 100%;
+  height: 190px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.reel-window::before,
+.reel-window::after {
+  content: "";
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  width: 180px;
+  height: 100%;
+  pointer-events: none;
+}
+
+.reel-window::before {
+  left: 0;
+  background: linear-gradient(90deg, rgba(6, 8, 13, 0.96), rgba(6, 8, 13, 0));
+}
+
+.reel-window::after {
+  right: 0;
+  background: linear-gradient(270deg, rgba(6, 8, 13, 0.96), rgba(6, 8, 13, 0));
+}
+
+.reel-track {
+  display: flex;
+  gap: var(--card-gap);
+  align-items: center;
+  height: 100%;
+  padding: 20px 0;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+}
+
+.reel-track.is-spinning {
+  transition-property: transform;
+  transition-timing-function: var(--ease-spin);
+}
+
+.prize-card {
+  position: relative;
+  flex: 0 0 var(--card-width);
+  width: var(--card-width);
+  height: var(--card-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.03);
+  text-align: center;
+}
+
+.prize-card.winner {
+  transform: scale(1.04);
+}
+
+.prize-name {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 25px;
+  line-height: 1.12;
+  font-weight: 800;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.75);
+}
+
+.rarity-common {
+  border-color: #b8c0c8;
+  background: linear-gradient(180deg, rgba(162, 174, 187, 0.28), rgba(70, 77, 86, 0.32));
+  box-shadow: 0 0 18px rgba(190, 202, 214, 0.3), inset 0 0 24px rgba(255, 255, 255, 0.05);
+}
+
+.rarity-rare {
+  border-color: #3ca3ff;
+  background: linear-gradient(180deg, rgba(44, 141, 255, 0.34), rgba(15, 45, 91, 0.48));
+  box-shadow: 0 0 24px rgba(54, 151, 255, 0.58), inset 0 0 24px rgba(99, 185, 255, 0.12);
+}
+
+.rarity-epic {
+  border-color: #c75cff;
+  background: linear-gradient(180deg, rgba(173, 72, 255, 0.38), rgba(67, 22, 105, 0.52));
+  box-shadow: 0 0 30px rgba(203, 92, 255, 0.68), inset 0 0 26px rgba(224, 144, 255, 0.14);
+}
+
+.rarity-legendary {
+  border-color: #ffcf4a;
+  background: linear-gradient(180deg, rgba(255, 199, 55, 0.46), rgba(117, 53, 12, 0.58));
+  box-shadow:
+    0 0 18px rgba(255, 205, 66, 0.82),
+    0 0 44px rgba(255, 126, 39, 0.56),
+    inset 0 0 28px rgba(255, 238, 157, 0.16);
+}
+
+.result-panel {
+  min-height: 96px;
+  margin-top: 26px;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+
+.result-panel.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.result-label {
+  display: block;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+#resultName {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 44px;
+  line-height: 1.1;
+  font-weight: 900;
+}
+
+.debug-panel {
+  position: fixed;
+  z-index: 20;
+  top: 18px;
+  left: 18px;
+  width: 300px;
+  display: none;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(12, 15, 22, 0.9);
+  color: #fff;
+  pointer-events: auto;
+}
+
+.debug-panel.is-enabled {
+  display: grid;
+}
+
+.debug-panel.is-collapsed > *:not(#toggleDebugPanel) {
+  display: none;
+}
+
+.debug-panel button,
+.debug-panel input {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+}
+
+.debug-panel button {
+  background: #edf2f7;
+  color: #101522;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.debug-panel button:hover {
+  background: #ffffff;
+}
+
+.donation-row {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.debug-panel input {
+  padding: 0 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.odds-output {
+  max-height: 230px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.88);
+}

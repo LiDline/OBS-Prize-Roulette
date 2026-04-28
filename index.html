@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OBS Roulette Overlay</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <main id="rouletteOverlay" class="roulette-overlay" aria-live="polite">
+      <section class="roulette-stage">
+        <div class="roulette-title">Рулетка призов</div>
+        <div class="pointer" aria-hidden="true"></div>
+
+        <div class="reel-window">
+          <div id="reelTrack" class="reel-track"></div>
+        </div>
+
+        <div id="resultPanel" class="result-panel">
+          <span class="result-label">Выпал приз</span>
+          <strong id="resultName">-</strong>
+        </div>
+      </section>
+    </main>
+
+    <aside id="debugPanel" class="debug-panel" aria-label="Debug panel">
+      <button id="toggleDebugPanel" type="button">Скрыть/показать панель</button>
+      <button id="testSpinButton" type="button">Тестовая прокрутка</button>
+      <button id="showOddsButton" type="button">Показать шансы</button>
+      <label class="donation-row">
+        <span>Сумма</span>
+        <input id="donationAmount" type="number" min="0" step="1" value="100">
+      </label>
+      <button id="simulateDonationButton" type="button">Симулировать донат</button>
+      <pre id="oddsOutput" class="odds-output"></pre>
+    </aside>
+
+    <script id="rouletteConfig" type="application/json">
+{
+  "donationThreshold": 100,
+  "spinDurationMs": 6000,
+  "resultDisplayMs": 3000,
+  "closeDelayMs": 800,
+  "sounds": {
+    "open": "assets/open.mp3",
+    "close": "assets/close.mp3"
+  },
+  "prizes": [
+    {
+      "id": "common_1",
+      "name": "Обычный приз",
+      "rarity": "common",
+      "weight": 60,
+      "sound": "assets/common.mp3"
+    },
+    {
+      "id": "rare_1",
+      "name": "Редкий приз",
+      "rarity": "rare",
+      "weight": 25,
+      "sound": "assets/rare.mp3"
+    },
+    {
+      "id": "epic_1",
+      "name": "Эпический приз",
+      "rarity": "epic",
+      "weight": 10,
+      "sound": "assets/epic.mp3"
+    },
+    {
+      "id": "legendary_1",
+      "name": "Легендарный приз",
+      "rarity": "legendary",
+      "weight": 5,
+      "sound": "assets/legendary.mp3"
+    }
+  ],
+  "donationAlerts": {
+    "enabled": false,
+    "accessToken": "PASTE_DONATIONALERTS_ACCESS_TOKEN_HERE",
+    "userId": "",
+    "socketConnectionToken": "",
+    "apiBaseUrl": "https://www.donationalerts.com/api/v1",
+    "socketUrl": "wss://centrifugo.donationalerts.com/connection/websocket",
+    "autoReconnect": true,
+    "reconnectDelayMs": 5000
+  }
+}
+    </script>
+    <script src="js/config.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/roulette.js"></script>
+    <script src="js/donation-alerts.js"></script>
+    <script src="js/debug.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
