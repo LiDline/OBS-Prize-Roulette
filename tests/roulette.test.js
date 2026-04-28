@@ -99,7 +99,8 @@ function createDocument() {
   };
 }
 
-function loadRoulette() {
+function loadRoulette(options) {
+  options = options || {};
   const document = createDocument();
   const pendingTimers = [];
   const playedSounds = [];
@@ -126,8 +127,12 @@ function loadRoulette() {
   context.window.requestAnimationFrame = context.requestAnimationFrame;
   context.window.Math = Object.create(Math);
   context.window.Math.random = function () {
-    return 0;
+    return options.random ? options.random() : 0;
   };
+
+  if (options.random) {
+    context.Math = context.window.Math;
+  }
   context.window.RouletteApp = {};
   context.window.RouletteApp.uploadedPrizeImages = [
     "uploads/Тестовый приз.png"
@@ -178,6 +183,7 @@ const loaded = loadRoulette();
 const roulette = loaded.app.roulette;
 
 assert.strictEqual(typeof roulette.calculatePrizeStopOffset, "function");
+assert.strictEqual(typeof roulette.buildReel, "function");
 
 const cardWidth = 220;
 const edgePadding = 28;
@@ -194,6 +200,45 @@ for (let i = 0; i < attempts; i += 1) {
 
 assert.ok(offsets.size > 1, "stop offset varies between spins");
 
+const shuffledLoaded = loadRoulette({
+  random: (function () {
+    const values = [
+      0, 0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95,
+      0, 0.95, 0.85, 0.75, 0.65, 0.55, 0.45, 0.35, 0.25, 0.15, 0.05
+    ];
+    let index = 0;
+
+    return function () {
+      const value = values[index % values.length];
+      index += 1;
+      return value;
+    };
+  }())
+});
+const shuffledRoulette = shuffledLoaded.app.roulette;
+const shuffledWinner = { id: 1, name: "A", weight: 1 };
+shuffledLoaded.app.state.config = Object.assign({}, shuffledLoaded.app.state.config, {
+  prizes: [
+    shuffledWinner,
+    { id: 2, name: "B", weight: 1 },
+    { id: 3, name: "C", weight: 1 },
+    { id: 4, name: "D", weight: 1 }
+  ]
+});
+
+const firstReel = shuffledRoulette.buildReel(shuffledWinner);
+const secondReel = shuffledRoulette.buildReel(shuffledWinner);
+const firstNeighborIds = firstReel.items.slice(firstReel.winnerIndex - 3, firstReel.winnerIndex + 4).map(function (prize) {
+  return prize.id;
+});
+const secondNeighborIds = secondReel.items.slice(secondReel.winnerIndex - 3, secondReel.winnerIndex + 4).map(function (prize) {
+  return prize.id;
+});
+
+assert.strictEqual(firstReel.items[firstReel.winnerIndex], shuffledWinner, "winner stays at the target reel position");
+assert.strictEqual(secondReel.items[secondReel.winnerIndex], shuffledWinner, "winner stays at the target reel position after reshuffle");
+assert.notDeepStrictEqual(firstNeighborIds, secondNeighborIds, "neighboring prizes change between reel builds");
+
 loaded.app.state.config = Object.assign({}, loaded.app.state.config, {
   prizes: [
     { id: 1, name: "Тестовый приз", weight: 1 },
@@ -205,7 +250,9 @@ loaded.app.state.config = Object.assign({}, loaded.app.state.config, {
 
 assert.strictEqual(roulette.startRoulette(), true, "spin starts with available prize image");
 
-const firstCard = loaded.app.state.elements.track.children[0];
+const firstCard = loaded.app.state.elements.track.children.find(function (child) {
+  return child.dataset.prizeId === 1;
+});
 const firstImage = firstCard.children.find(function (child) {
   return child.tagName === "img";
 });
@@ -223,7 +270,9 @@ assert.ok(
   "card falls back to prize name when image is missing"
 );
 
-const secondCard = loaded.app.state.elements.track.children[1];
+const secondCard = loaded.app.state.elements.track.children.find(function (child) {
+  return child.dataset.prizeId === 2;
+});
 const secondImage = secondCard.children.find(function (child) {
   return child.tagName === "img";
 });

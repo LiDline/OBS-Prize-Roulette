@@ -76,8 +76,12 @@
     var winnerIndex = 42;
     var totalItems = 64;
 
-    for (var i = 0; i < totalItems; i += 1) {
-      items.push(sourcePrizes[i % sourcePrizes.length]);
+    while (items.length < totalItems) {
+      shufflePrizes(sourcePrizes).forEach(function (prize) {
+        if (items.length < totalItems) {
+          items.push(prize);
+        }
+      });
     }
 
     items[winnerIndex] = winner;
@@ -86,6 +90,20 @@
       items: items,
       winnerIndex: winnerIndex
     };
+  }
+
+  function shufflePrizes(prizes) {
+    var shuffled = prizes.slice();
+
+    for (var i = shuffled.length - 1; i > 0; i -= 1) {
+      var swapIndex = Math.floor(Math.random() * (i + 1));
+      var currentPrize = shuffled[i];
+
+      shuffled[i] = shuffled[swapIndex];
+      shuffled[swapIndex] = currentPrize;
+    }
+
+    return shuffled;
   }
 
   function renderReel(items, winnerIndex) {
@@ -217,6 +235,7 @@
   }
 
   app.roulette = {
+    buildReel: buildReel,
     buildPrizeImageSrc: buildPrizeImageSrc,
     calculatePrizeStopOffset: calculatePrizeStopOffset,
     pickWeightedPrize: pickWeightedPrize,
