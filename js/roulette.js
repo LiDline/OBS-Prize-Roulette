@@ -10,8 +10,9 @@
 
   function startRoulette() {
     if (state.isSpinning) {
-      console.warn("Roulette is already active.");
-      return false;
+      state.queuedSpins += 1;
+      console.warn("Roulette is already active. Spin queued:", state.queuedSpins);
+      return true;
     }
 
     var winner = pickWeightedPrize(state.config.prizes);
@@ -152,8 +153,18 @@
       window.setTimeout(function () {
         hideOverlay();
         state.isSpinning = false;
+        startNextQueuedSpin();
       }, Math.max(0, Number(state.config.closeDelayMs) || 0));
     }, Math.max(0, Number(state.config.resultDisplayMs) || fallbackConfig.resultDisplayMs));
+  }
+
+  function startNextQueuedSpin() {
+    if (state.queuedSpins <= 0) {
+      return;
+    }
+
+    state.queuedSpins -= 1;
+    startRoulette();
   }
 
   function showOverlay() {

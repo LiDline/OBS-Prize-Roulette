@@ -5,6 +5,7 @@
   window.RouletteApp.state = {
     config: window.RouletteApp.config.fallbackConfig,
     isSpinning: false,
+    queuedSpins: 0,
     elements: {},
     itemWidth: 238,
     donationAlerts: {
