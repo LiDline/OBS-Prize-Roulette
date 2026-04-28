@@ -24,10 +24,23 @@
       return false;
     }
 
-    if (numericAmount >= threshold) {
-      return app.roulette.startRoulette({
-        donorName: donationData.username
-      });
+    if (!Number.isFinite(threshold) || threshold <= 0) {
+      console.warn("Donation threshold is not a valid positive number:", state.config.donationThreshold);
+      return false;
+    }
+
+    var spinCount = Math.floor(numericAmount / threshold);
+
+    if (spinCount > 0) {
+      for (var i = 0; i < spinCount; i += 1) {
+        app.roulette.startRoulette({
+          donorName: donationData.username,
+          spinIndex: i + 1,
+          spinCount: spinCount
+        });
+      }
+
+      return true;
     }
 
     console.warn("Donation below threshold:", numericAmount, "required:", threshold);

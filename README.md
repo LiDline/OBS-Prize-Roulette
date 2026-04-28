@@ -29,6 +29,10 @@ http://localhost:8000/
 
 ```text
 http://localhost:8000/?debug=1
+
+или:
+
+file:///home/lidline/Документы/test/OBS-Prize-Roulette/index.html?debug=1
 ```
 
 Пример:
@@ -43,7 +47,7 @@ http://localhost:8000/?debug=1
 
 ```jsonc
 {
-  "donationThreshold": 500,       // Минимальная сумма доната для запуска рулетки
+  "donationThreshold": 500,       // Сумма доната за одну прокрутку рулетки
   "spinDurationMs": 6000,         // Длительность вращения ленты
   "resultDisplayMs": 3000,        // Сколько показывать выпавший приз
   "closeDelayMs": 800,            // Задержка перед скрытием оверлея после звука закрытия
@@ -131,7 +135,5 @@ OBS-Prize-Roulette/
 |-- scripts/
 |   `-- generate-uploaded-images-manifest.js  # Проверка на наличие изображений
 |-- tests/                                    # Тесты
-|   |-- roulette.test.js
-|   `-- uploaded-images-manifest.test.js
 `-- README.md
 ```

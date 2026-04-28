@@ -176,12 +176,16 @@
   function normalizeSpinContext(spinContext) {
     if (!spinContext || typeof spinContext !== "object") {
       return {
-        donorName: ""
+        donorName: "",
+        spinIndex: 0,
+        spinCount: 0
       };
     }
 
     return {
-      donorName: spinContext.donorName || ""
+      donorName: spinContext.donorName || "",
+      spinIndex: Math.max(0, Math.floor(Number(spinContext.spinIndex) || 0)),
+      spinCount: Math.max(0, Math.floor(Number(spinContext.spinCount) || 0))
     };
   }
 
@@ -257,9 +261,17 @@
     }
 
     var donorName = spinContext && spinContext.donorName;
-    state.elements.title.textContent = donorName
+    var spinIndex = spinContext && spinContext.spinIndex;
+    var spinCount = spinContext && spinContext.spinCount;
+    var title = donorName
       ? "Рулетка призов для " + donorName
       : "Рулетка призов";
+
+    if (spinCount > 1 && spinIndex > 0) {
+      title += " - " + spinIndex + "/" + spinCount;
+    }
+
+    state.elements.title.textContent = title;
   }
 
   app.roulette = {

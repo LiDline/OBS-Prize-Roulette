@@ -312,6 +312,33 @@ assert.strictEqual(
   "roulette title shows donor name"
 );
 
+const donorCounterLoaded = loadRoulette();
+donorCounterLoaded.app.state.config = Object.assign({}, donorCounterLoaded.app.state.config, {
+  prizes: [
+    { id: 1, name: "Донатный приз", weight: 1 }
+  ],
+  resultDisplayMs: 0,
+  closeDelayMs: 0
+});
+
+assert.strictEqual(
+  donorCounterLoaded.app.roulette.startRoulette({
+    donorName: "testName",
+    spinIndex: 1,
+    spinCount: 3
+  }),
+  true,
+  "spin starts with donation spin counter"
+);
+
+donorCounterLoaded.context.runTimers();
+
+assert.strictEqual(
+  donorCounterLoaded.app.state.elements.title.textContent,
+  "Рулетка призов для testName · 1/3",
+  "roulette title shows donation spin counter"
+);
+
 loaded.app.state.config = Object.assign({}, loaded.app.state.config, {
   resultDisplayMs: 0,
   closeDelayMs: 0
