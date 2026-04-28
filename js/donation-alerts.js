@@ -6,15 +6,13 @@
 
   function initDonationAlerts() {
     var settings = state.config.donationAlerts || {};
+    var accessToken = typeof settings.accessToken === "string" ? settings.accessToken.trim() : "";
 
-    if (!settings.enabled) {
+    if (!accessToken) {
       return;
     }
 
-    if (!settings.accessToken || settings.accessToken === "PASTE_DONATIONALERTS_ACCESS_TOKEN_HERE") {
-      console.warn("DonationAlerts integration is enabled, but accessToken is still a placeholder.");
-      return;
-    }
+    settings.accessToken = accessToken;
 
     if (typeof WebSocket === "undefined") {
       console.warn("DonationAlerts integration requires WebSocket support.");

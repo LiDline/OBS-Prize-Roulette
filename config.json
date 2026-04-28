@@ -1,12 +1,5 @@
 {
   "donationThreshold": 100,
-  "spinDurationMs": 6000,
-  "resultDisplayMs": 3000,
-  "closeDelayMs": 800,
-  "sounds": {
-    "open": "assets/open.mp3",
-    "close": "assets/close.mp3"
-  },
   "prizes": [
     {
       "id": "common_1",
@@ -38,13 +31,10 @@
     }
   ],
   "donationAlerts": {
-    "enabled": false,
-    "accessToken": "PASTE_DONATIONALERTS_ACCESS_TOKEN_HERE",
+    "accessToken": "",
     "userId": "",
     "socketConnectionToken": "",
     "apiBaseUrl": "https://www.donationalerts.com/api/v1",
-    "socketUrl": "wss://centrifugo.donationalerts.com/connection/websocket",
-    "autoReconnect": true,
-    "reconnectDelayMs": 5000
+    "socketUrl": "wss://centrifugo.donationalerts.com/connection/websocket"
   }
 }

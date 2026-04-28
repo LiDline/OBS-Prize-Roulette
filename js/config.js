@@ -11,8 +11,7 @@
       close: "assets/close.mp3"
     },
     donationAlerts: {
-      enabled: false,
-      accessToken: "PASTE_DONATIONALERTS_ACCESS_TOKEN_HERE",
+      accessToken: "",
       userId: "",
       socketConnectionToken: "",
       apiBaseUrl: "https://www.donationalerts.com/api/v1",
