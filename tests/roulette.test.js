@@ -29,7 +29,30 @@ function createElement(tagName) {
     parentElement: null,
     style: {},
     textContent: "",
+    attributes: {},
+    setAttribute: function (name, value) {
+      element.attributes[name] = value;
+      element[name] = value;
+    },
+    remove: function () {
+      if (!element.parentElement) {
+        return;
+      }
+
+      element.parentElement.children = element.parentElement.children.filter(function (child) {
+        return child !== element;
+      });
+      element.parentElement = null;
+    },
     appendChild: function (child) {
+      if (child.tagName === "fragment") {
+        child.children.slice().forEach(function (fragmentChild) {
+          element.appendChild(fragmentChild);
+        });
+        child.children = [];
+        return child;
+      }
+
       child.parentElement = element;
       element.children.push(child);
       return child;
@@ -101,6 +124,10 @@ function loadRoulette() {
     return pendingTimers.length;
   };
   context.window.requestAnimationFrame = context.requestAnimationFrame;
+  context.window.Math = Object.create(Math);
+  context.window.Math.random = function () {
+    return 0;
+  };
   context.window.RouletteApp = {};
   context.window.getComputedStyle = function () {
     return {
@@ -165,9 +192,44 @@ for (let i = 0; i < attempts; i += 1) {
 assert.ok(offsets.size > 1, "stop offset varies between spins");
 
 loaded.app.state.config = Object.assign({}, loaded.app.state.config, {
+  prizes: [
+    { id: 1, name: "Тестовый приз", weight: 1 },
+    { id: 2, name: "Текстовый приз", weight: 1 }
+  ],
   resultDisplayMs: 0,
   closeDelayMs: 0
 });
+
+assert.strictEqual(roulette.startRoulette(), true, "spin starts with generated prize image");
+
+const firstCard = loaded.app.state.elements.track.children[0];
+const firstImage = firstCard.children.find(function (child) {
+  return child.tagName === "img";
+});
+
+assert.ok(firstImage, "card includes an image");
+assert.strictEqual(firstImage.src, "uploads/Тестовый приз.png", "image path is derived from prize name");
+assert.strictEqual(firstImage.alt, "Тестовый приз", "image alt uses prize name");
+
+firstImage.onerror();
+
+assert.ok(
+  firstCard.children.some(function (child) {
+    return child.className === "prize-name" && child.textContent === "Тестовый приз";
+  }),
+  "card falls back to prize name when image is missing"
+);
+
+loaded.context.runTimers();
+
+loaded.app.state.config = Object.assign({}, loaded.app.state.config, {
+  resultDisplayMs: 0,
+  closeDelayMs: 0
+});
+
+const openSoundCountBeforeQueueTest = loaded.context.playedSounds.filter(function (src) {
+  return src === loaded.app.state.config.sounds.open;
+}).length;
 
 assert.strictEqual(roulette.startRoulette(), true, "first spin starts immediately");
 assert.strictEqual(roulette.startRoulette(), true, "second spin is queued while first spin is active");
@@ -177,7 +239,7 @@ loaded.context.runTimers();
 assert.strictEqual(
   loaded.context.playedSounds.filter(function (src) {
     return src === loaded.app.state.config.sounds.open;
-  }).length,
+  }).length - openSoundCountBeforeQueueTest,
   2,
   "queued spin starts after the active spin finishes"
 );

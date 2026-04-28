@@ -4,7 +4,6 @@
   var app = window.RouletteApp;
   var state = app.state;
   var fallbackConfig = app.config.fallbackConfig;
-  var normalizeRarity = app.utils.normalizeRarity;
   var readCssPixels = app.utils.readCssPixels;
   var safePlaySound = app.utils.safePlaySound;
 
@@ -100,19 +99,43 @@
 
     items.forEach(function (prize, index) {
       var card = document.createElement("div");
-      var rarity = normalizeRarity(prize.rarity);
-      card.className = "prize-card rarity-" + rarity + (index === winnerIndex ? " winner" : "");
+      card.className = "prize-card" + (index === winnerIndex ? " winner" : "");
       card.dataset.prizeId = prize.id || "";
 
-      var name = document.createElement("span");
-      name.className = "prize-name";
-      name.textContent = prize.name || "Приз";
-      card.appendChild(name);
+      renderPrizeCardContent(card, prize);
       fragment.appendChild(card);
     });
 
     track.appendChild(fragment);
     void track.offsetWidth;
+  }
+
+  function renderPrizeCardContent(card, prize) {
+    var prizeName = prize.name || "Приз";
+    var image = document.createElement("img");
+
+    image.className = "prize-image";
+    image.src = buildPrizeImageSrc(prizeName);
+    image.alt = prizeName;
+    image.onerror = function () {
+      image.onerror = null;
+      image.remove();
+      appendPrizeName(card, prizeName);
+    };
+
+    card.appendChild(image);
+  }
+
+  function appendPrizeName(card, prizeName) {
+    var name = document.createElement("span");
+
+    name.className = "prize-name";
+    name.textContent = prizeName;
+    card.appendChild(name);
+  }
+
+  function buildPrizeImageSrc(prizeName) {
+    return "uploads/" + prizeName + ".png";
   }
 
   function spinToWinner(winnerIndex, winner) {
@@ -146,7 +169,7 @@
   function showResult(winner) {
     state.elements.resultName.textContent = winner.name || "Приз";
     state.elements.resultPanel.classList.add("is-visible");
-    safePlaySound(winner.sound);
+    safePlaySound(state.config.sound || winner.sound);
 
     window.setTimeout(function () {
       safePlaySound(state.config.sounds && state.config.sounds.close);
@@ -181,6 +204,7 @@
   }
 
   app.roulette = {
+    buildPrizeImageSrc: buildPrizeImageSrc,
     calculatePrizeStopOffset: calculatePrizeStopOffset,
     pickWeightedPrize: pickWeightedPrize,
     startRoulette: startRoulette

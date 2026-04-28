@@ -3,7 +3,6 @@
 
   var app = window.RouletteApp;
   var state = app.state;
-  var normalizeRarity = app.utils.normalizeRarity;
 
   function setupDebugPanel() {
     var params = new URLSearchParams(window.location.search);
@@ -35,7 +34,7 @@
 
     return validPrizes.map(function (prize) {
       var chance = (Number(prize.weight) / totalWeight) * 100;
-      return prize.name + " [" + normalizeRarity(prize.rarity) + "]: " + chance.toFixed(2) + "%";
+      return prize.name + ": " + chance.toFixed(2) + "%";
     }).join("\n");
   }
 

@@ -25,11 +25,6 @@
     }
   }
 
-  function normalizeRarity(rarity) {
-    var value = String(rarity || "common").toLowerCase();
-    return ["common", "rare", "epic", "legendary"].indexOf(value) >= 0 ? value : "common";
-  }
-
   function readCssPixels(variableName) {
     var value = getComputedStyle(document.documentElement).getPropertyValue(variableName);
     var parsed = parseFloat(value);
@@ -38,7 +33,6 @@
 
   window.RouletteApp = window.RouletteApp || {};
   window.RouletteApp.utils = {
-    normalizeRarity: normalizeRarity,
     readCssPixels: readCssPixels,
     safePlaySound: safePlaySound
   };
