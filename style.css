@@ -283,3 +283,58 @@ input {
   line-height: 1.35;
   color: rgba(255, 255, 255, 0.88);
 }
+
+.donation-auth-panel {
+  position: fixed;
+  z-index: 30;
+  top: 18px;
+  right: 18px;
+  width: 390px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(12, 15, 22, 0.92);
+  color: #fff;
+  pointer-events: auto;
+}
+
+.donation-auth-panel strong {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.donation-auth-row {
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.donation-auth-row input {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.donation-auth-button {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: #edf2f7;
+  color: #101522;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+}
+
+.donation-auth-button:hover {
+  background: #ffffff;
+}

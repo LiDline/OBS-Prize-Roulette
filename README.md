@@ -11,13 +11,14 @@
 Для работы с внешним `config.json` и DonationAlerts запускайте проект через
 локальный Node-сервер.
 
-Сначала создайте локальный `.env` на основе примера:
+Если хотите переопределить host, port или адрес DonationAlerts API, создайте
+локальный `.env` на основе примера:
 
 ```bash
 cp .env.example .env
 ```
 
-Затем впишите OAuth access token в `DONATIONALERTS_ACCESS_TOKEN` и запустите:
+Затем запустите сервер:
 
 ```bash
 node server.js
@@ -98,6 +99,7 @@ node scripts/generate-uploaded-images-manifest.js
 ```json
 {
   "donationAlerts": {
+    "applicationId": "",
     "proxyBaseUrl": "/api/donationalerts",
     "socketUrl": "wss://centrifugo.donationalerts.com/connection/websocket",
     "autoReconnect": true,
@@ -106,12 +108,18 @@ node scripts/generate-uploaded-images-manifest.js
 }
 ```
 
-Браузерный конфиг содержит только адрес локального прокси и параметры WebSocket.
-OAuth access token не хранится в `config.json`: REST-запросы к DonationAlerts
-выполняет локальный `server.js`.
+Браузерный конфиг содержит ID приложения, адрес локального прокси и параметры
+WebSocket. OAuth access token не хранится в `config.json`.
 
-Для подключения нужен `DONATIONALERTS_ACCESS_TOKEN` в `.env`. Сервер использует
-его, чтобы получить данные WebSocket через DonationAlerts API.
+Если токена нет или он больше не валиден, страница покажет кнопку
+`Получить токен у donationalerts`, пустое поле ID приложения и URL редиректа.
+Впишите ID приложения в поле и перейдите по кнопке авторизации. После
+авторизации DonationAlerts вернет браузер на локальную страницу, а оверлей
+сохранит access token в `localStorage` и будет передавать его в локальный
+прокси.
+
+Сервер использует только токен из браузерного запроса. Старый OAuth-токен из
+`.env` больше не поддерживается и не влияет на подключение.
 
 Признак успешного подключения в консоли браузера:
 

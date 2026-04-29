@@ -12,7 +12,8 @@
     donationAlerts: {
       socket: null,
       messageId: 1,
-      reconnectTimer: null
+      reconnectTimer: null,
+      authPanel: null
     }
   };
 }(window));

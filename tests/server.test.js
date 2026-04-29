@@ -131,7 +131,6 @@ function createHangingDonationAlertsStub() {
   const overlayServer = server.createServer({
     rootDir: process.cwd(),
     env: {
-      DONATIONALERTS_ACCESS_TOKEN: "access-token",
       DONATIONALERTS_API_BASE_URL: donationAlertsUrl
     }
   });
@@ -139,7 +138,9 @@ function createHangingDonationAlertsStub() {
   const overlayUrl = "http://127.0.0.1:" + overlayInstance.address().port;
 
   try {
-    const auth = await requestJson(overlayUrl, "/api/donationalerts/auth");
+    const auth = await requestJson(overlayUrl, "/api/donationalerts/auth", {
+      headers: { Authorization: "Bearer access-token" }
+    });
     assert.strictEqual(auth.status, 200, "auth endpoint responds with success");
     assert.deepStrictEqual(auth.body, {
       userId: 321,
@@ -148,7 +149,10 @@ function createHangingDonationAlertsStub() {
 
     const subscribe = await requestJson(overlayUrl, "/api/donationalerts/subscribe", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer access-token"
+      },
       body: JSON.stringify({
         channels: ["$alerts:donation_321"],
         client: "client-id"
@@ -197,12 +201,81 @@ function createHangingDonationAlertsStub() {
     await close(donationAlertsServer);
   }
 
+  const envTokenDonationAlerts = createDonationAlertsStub();
+  const envTokenDonationAlertsServer = await listen(envTokenDonationAlerts.app);
+  const envTokenDonationAlertsUrl = "http://127.0.0.1:" + envTokenDonationAlertsServer.address().port;
+  const legacyEnvTokenName = "DONATIONALERTS_" + "ACCESS_TOKEN";
+  const envWithLegacyToken = {
+    DONATIONALERTS_API_BASE_URL: envTokenDonationAlertsUrl
+  };
+  envWithLegacyToken[legacyEnvTokenName] = "ignored-env-token";
+  const envTokenOverlayServer = server.createServer({
+    rootDir: process.cwd(),
+    env: envWithLegacyToken
+  });
+  const envTokenOverlayInstance = await listen(envTokenOverlayServer);
+  const envTokenOverlayUrl = "http://127.0.0.1:" + envTokenOverlayInstance.address().port;
+
+  try {
+    const envTokenAuth = await requestJson(envTokenOverlayUrl, "/api/donationalerts/auth");
+    assert.strictEqual(envTokenAuth.status, 401, "auth rejects requests without browser access token");
+    assert.deepStrictEqual(envTokenAuth.body, {
+      error: "DonationAlerts access token is required."
+    });
+    assert.deepStrictEqual(envTokenDonationAlerts.requests, [], "server ignores legacy env access token");
+  } finally {
+    await close(envTokenOverlayInstance);
+    await close(envTokenDonationAlertsServer);
+  }
+
+  const browserTokenDonationAlerts = createDonationAlertsStub();
+  const browserTokenDonationAlertsServer = await listen(browserTokenDonationAlerts.app);
+  const browserTokenDonationAlertsUrl = "http://127.0.0.1:" + browserTokenDonationAlertsServer.address().port;
+  const browserTokenOverlayServer = server.createServer({
+    rootDir: process.cwd(),
+    env: {
+      DONATIONALERTS_API_BASE_URL: browserTokenDonationAlertsUrl
+    }
+  });
+  const browserTokenOverlayInstance = await listen(browserTokenOverlayServer);
+  const browserTokenOverlayUrl = "http://127.0.0.1:" + browserTokenOverlayInstance.address().port;
+
+  try {
+    const browserTokenAuth = await requestJson(browserTokenOverlayUrl, "/api/donationalerts/auth", {
+      headers: { Authorization: "Bearer browser-token" }
+    });
+    assert.strictEqual(browserTokenAuth.status, 200, "auth accepts browser-provided access token");
+
+    const browserTokenSubscribe = await requestJson(browserTokenOverlayUrl, "/api/donationalerts/subscribe", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer browser-token"
+      },
+      body: JSON.stringify({
+        channels: ["$alerts:donation_321"],
+        client: "client-id"
+      })
+    });
+    assert.strictEqual(browserTokenSubscribe.status, 200, "subscribe accepts browser-provided access token");
+
+    assert.deepStrictEqual(
+      browserTokenDonationAlerts.requests.map(function (request) {
+        return request.authorization;
+      }),
+      ["Bearer browser-token", "Bearer browser-token"],
+      "server forwards browser-provided access token to DonationAlerts"
+    );
+  } finally {
+    await close(browserTokenOverlayInstance);
+    await close(browserTokenDonationAlertsServer);
+  }
+
   const hangingDonationAlertsServer = await listen(createHangingDonationAlertsStub());
   const hangingDonationAlertsUrl = "http://127.0.0.1:" + hangingDonationAlertsServer.address().port;
   const timeoutOverlayServer = server.createServer({
     rootDir: process.cwd(),
     env: {
-      DONATIONALERTS_ACCESS_TOKEN: "access-token",
       DONATIONALERTS_API_BASE_URL: hangingDonationAlertsUrl,
       DONATIONALERTS_REQUEST_TIMEOUT_MS: "10"
     }
@@ -211,7 +284,9 @@ function createHangingDonationAlertsStub() {
   const timeoutOverlayUrl = "http://127.0.0.1:" + timeoutOverlayInstance.address().port;
 
   try {
-    const timeoutResponse = await requestJson(timeoutOverlayUrl, "/api/donationalerts/auth");
+    const timeoutResponse = await requestJson(timeoutOverlayUrl, "/api/donationalerts/auth", {
+      headers: { Authorization: "Bearer access-token" }
+    });
     assert.strictEqual(timeoutResponse.status, 504, "auth endpoint returns gateway timeout");
     assert.deepStrictEqual(timeoutResponse.body, {
       error: "DonationAlerts API /user/oauth timed out."

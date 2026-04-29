@@ -26,7 +26,7 @@ function createServer(options) {
 
   return http.createServer(function (request, response) {
     if (request.url === "/api/donationalerts/auth" && request.method === "GET") {
-      handleDonationAlertsAuth(response, env);
+      handleDonationAlertsAuth(request, response, env);
       return;
     }
 
@@ -39,10 +39,11 @@ function createServer(options) {
   });
 }
 
-async function handleDonationAlertsAuth(response, env) {
+async function handleDonationAlertsAuth(request, response, env) {
   try {
     const profile = await donationAlertsApiRequest(env, "/user/oauth", {
-      method: "GET"
+      method: "GET",
+      accessToken: getDonationAlertsAccessToken(request)
     });
     const profileData = profile && profile.data ? profile.data : {};
 
@@ -74,6 +75,7 @@ async function handleDonationAlertsSubscribe(request, response, env) {
 
     const subscription = await donationAlertsApiRequest(env, "/centrifuge/subscribe", {
       method: "POST",
+      accessToken: getDonationAlertsAccessToken(request),
       body: JSON.stringify({
         channels: body.channels,
         client: body.client
@@ -89,11 +91,11 @@ async function handleDonationAlertsSubscribe(request, response, env) {
 }
 
 function donationAlertsApiRequest(env, pathname, options) {
-  const accessToken = env.DONATIONALERTS_ACCESS_TOKEN;
+  const accessToken = options.accessToken;
 
   if (!accessToken) {
-    const error = new Error("DONATIONALERTS_ACCESS_TOKEN is not set.");
-    error.statusCode = 500;
+    const error = new Error("DonationAlerts access token is required.");
+    error.statusCode = 401;
     throw error;
   }
 
@@ -150,6 +152,17 @@ function donationAlertsApiRequest(env, pathname, options) {
 
     apiRequest.end();
   });
+}
+
+function getDonationAlertsAccessToken(request) {
+  const authorization = request.headers.authorization || "";
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+
+  if (match && match[1].trim()) {
+    return match[1].trim();
+  }
+
+  return "";
 }
 
 function readRequestJson(request) {
