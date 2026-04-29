@@ -4,13 +4,6 @@
   "resultDisplayMs": 3000,
   "closeDelayMs": 800,
   "sound": "assets/card-change.mp3",
-  "donationAlerts": {
-    "applicationId": "",
-    "proxyBaseUrl": "/api/donationalerts",
-    "socketUrl": "wss://centrifugo.donationalerts.com/connection/websocket",
-    "autoReconnect": true,
-    "reconnectDelayMs": 5000
-  },
   "prizes": [
     {
       "id": 1,

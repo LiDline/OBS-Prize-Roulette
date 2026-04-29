@@ -32,8 +32,8 @@ function generateManifest(options) {
 
 if (require.main === module) {
   generateManifest({
-    uploadsDir: path.join(__dirname, "..", "uploads"),
-    outputPath: path.join(__dirname, "..", "js", "uploaded-images.js"),
+    uploadsDir: path.join(__dirname, "..", "..", "uploads"),
+    outputPath: path.join(__dirname, "..", "..", "frontend", "js", "uploaded-images.js"),
     uploadsUrl: "uploads"
   });
 }

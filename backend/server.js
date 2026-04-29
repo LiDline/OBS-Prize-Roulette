@@ -21,8 +21,10 @@ const MIME_TYPES = {
 function createServer(options) {
   options = options || {};
 
-  const rootDir = options.rootDir || __dirname;
-  const env = Object.assign({}, parseEnvFile(path.join(rootDir, ".env")), process.env, options.env || {});
+  const projectRoot = options.rootDir || path.resolve(__dirname, "..");
+  const frontendDir = options.frontendDir || path.join(projectRoot, "frontend");
+  const uploadsDir = options.uploadsDir || path.join(projectRoot, "uploads");
+  const env = Object.assign({}, parseEnvFile(path.join(projectRoot, ".env")), process.env, options.env || {});
 
   return http.createServer(function (request, response) {
     if (request.url === "/api/donationalerts/auth" && request.method === "GET") {
@@ -35,7 +37,7 @@ function createServer(options) {
       return;
     }
 
-    serveStaticFile(request, response, rootDir);
+    serveStaticRequest(request, response, frontendDir, uploadsDir);
   });
 }
 
@@ -185,13 +187,23 @@ function readRequestJson(request) {
   });
 }
 
-function serveStaticFile(request, response, rootDir) {
+function serveStaticRequest(request, response, frontendDir, uploadsDir) {
   const requestUrl = new URL(request.url, "http://localhost");
   const pathname = decodeURIComponent(requestUrl.pathname);
-  const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
-  const filePath = path.resolve(rootDir, relativePath);
 
-  if (!filePath.startsWith(path.resolve(rootDir) + path.sep) && filePath !== path.resolve(rootDir)) {
+  if (pathname.indexOf("/uploads/") === 0) {
+    serveStaticFile(response, uploadsDir, pathname.slice("/uploads/".length));
+    return;
+  }
+
+  serveStaticFile(response, frontendDir, pathname === "/" ? "index.html" : pathname.replace(/^\/+/, ""));
+}
+
+function serveStaticFile(response, baseDir, relativePath) {
+  const resolvedBaseDir = path.resolve(baseDir);
+  const filePath = path.resolve(resolvedBaseDir, relativePath);
+
+  if (!filePath.startsWith(resolvedBaseDir + path.sep) && filePath !== resolvedBaseDir) {
     writeText(response, 403, "Forbidden");
     return;
   }
@@ -255,7 +267,7 @@ if (require.main === module) {
   const port = Number(process.env.PORT) || DEFAULT_PORT;
   const host = process.env.HOST || DEFAULT_HOST;
 
-  createServer({ rootDir: __dirname }).listen(port, host, function () {
+  createServer().listen(port, host, function () {
     console.log("OBS Prize Roulette server: http://" + host + ":" + port + "/");
   });
 }

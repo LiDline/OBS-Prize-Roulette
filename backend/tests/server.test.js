@@ -1,5 +1,8 @@
 const assert = require("assert");
+const fs = require("fs");
 const http = require("http");
+const os = require("os");
+const path = require("path");
 
 const server = require("../server");
 
@@ -66,6 +69,36 @@ function requestJson(baseUrl, pathname, options) {
   });
 }
 
+function requestText(baseUrl, pathname) {
+  const requestUrl = new URL(baseUrl + pathname);
+
+  return new Promise(function (resolve, reject) {
+    const request = http.request({
+      method: "GET",
+      hostname: requestUrl.hostname,
+      port: requestUrl.port,
+      path: requestUrl.pathname
+    }, function (response) {
+      let body = "";
+
+      response.on("data", function (chunk) {
+        body += chunk;
+      });
+
+      response.on("end", function () {
+        resolve({
+          status: response.statusCode,
+          contentType: response.headers["content-type"],
+          body: body
+        });
+      });
+    });
+
+    request.on("error", reject);
+    request.end();
+  });
+}
+
 function createDonationAlertsStub() {
   const requests = [];
   const app = http.createServer(function (request, response) {
@@ -124,6 +157,35 @@ function createHangingDonationAlertsStub() {
 }
 
 (async function () {
+  const staticRoot = fs.mkdtempSync(path.join(os.tmpdir(), "roulette-static-"));
+  const frontendDir = path.join(staticRoot, "frontend");
+  const uploadsDir = path.join(staticRoot, "uploads");
+  fs.mkdirSync(frontendDir);
+  fs.mkdirSync(uploadsDir);
+  fs.writeFileSync(path.join(frontendDir, "index.html"), "<!doctype html><title>frontend</title>");
+  fs.writeFileSync(path.join(uploadsDir, "Prize.png"), "png");
+
+  const staticOverlayServer = server.createServer({
+    frontendDir,
+    uploadsDir,
+    env: {}
+  });
+  const staticOverlayInstance = await listen(staticOverlayServer);
+  const staticOverlayUrl = "http://127.0.0.1:" + staticOverlayInstance.address().port;
+
+  try {
+    const index = await requestText(staticOverlayUrl, "/");
+    assert.strictEqual(index.status, 200, "root serves frontend index");
+    assert.strictEqual(index.body, "<!doctype html><title>frontend</title>");
+
+    const upload = await requestText(staticOverlayUrl, "/uploads/Prize.png");
+    assert.strictEqual(upload.status, 200, "uploads are served outside frontend");
+    assert.strictEqual(upload.contentType, "image/png");
+    assert.strictEqual(upload.body, "png");
+  } finally {
+    await close(staticOverlayInstance);
+  }
+
   const donationAlerts = createDonationAlertsStub();
   const donationAlertsServer = await listen(donationAlerts.app);
   const donationAlertsUrl = "http://127.0.0.1:" + donationAlertsServer.address().port;
