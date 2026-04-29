@@ -4,6 +4,7 @@
   var app = window.RouletteApp;
   var state = app.state;
   var PROXY_BASE_URL = "/api/donationalerts";
+  var authCheckInFlight = false;
 
   function initDonationAlerts() {
     captureDonationAlertsAccessToken().then(function () {
@@ -61,8 +62,35 @@
     });
 
     state.donationAlerts.events.addEventListener("error", function () {
-      console.error("DonationAlerts local event stream failed.");
-      showDonationAlertsTokenPanel();
+      console.warn("DonationAlerts local event stream interrupted; waiting for browser reconnect.");
+      checkDonationAlertsAuthAfterStreamError();
+    });
+  }
+
+  function checkDonationAlertsAuthAfterStreamError() {
+    if (authCheckInFlight) {
+      return;
+    }
+
+    authCheckInFlight = true;
+
+    donationAlertsProxyRequest("/auth", {
+      method: "GET"
+    }).catch(function (error) {
+      if (error && error.status === 401) {
+        console.error("DonationAlerts auth check failed after local event stream error.", error);
+
+        if (state.donationAlerts.events && typeof state.donationAlerts.events.close === "function") {
+          state.donationAlerts.events.close();
+        }
+
+        showDonationAlertsTokenPanel();
+        return;
+      }
+
+      console.warn("DonationAlerts auth check could not confirm token loss; keeping EventSource reconnect active.", error);
+    }).finally(function () {
+      authCheckInFlight = false;
     });
   }
 
@@ -83,7 +111,9 @@
     });
 
     if (!response.ok) {
-      throw new Error("DonationAlerts proxy " + path + " failed with HTTP " + response.status);
+      var error = new Error("DonationAlerts proxy " + path + " failed with HTTP " + response.status);
+      error.status = response.status;
+      throw error;
     }
 
     return response.json();

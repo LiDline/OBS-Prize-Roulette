@@ -103,9 +103,11 @@ function requestText(baseUrl, pathname) {
 function openEventStream(baseUrl, pathname) {
   const requestUrl = new URL(baseUrl + pathname);
   const events = [];
+  const comments = [];
 
   const stream = {
     events,
+    comments,
     close: function () {
       if (stream.request) {
         stream.request.destroy();
@@ -135,9 +137,14 @@ function openEventStream(baseUrl, pathname) {
           const dataLine = eventBlock.split(/\n/).find(function (line) {
             return line.indexOf("data: ") === 0;
           });
+          const commentLine = eventBlock.split(/\n/).find(function (line) {
+            return line.indexOf(": ") === 0;
+          });
 
           if (dataLine) {
             events.push(JSON.parse(dataLine.slice("data: ".length)));
+          } else if (commentLine) {
+            comments.push(commentLine.slice(": ".length));
           }
         });
       });
@@ -292,7 +299,8 @@ function createHangingDonationAlertsStub() {
     donationAlertsSocketFactory: fakeSocket.factory,
     env: {
       DONATIONALERTS_API_BASE_URL: donationAlertsUrl,
-      DONATIONALERTS_SOCKET_URL: "ws://127.0.0.1/donation-alerts"
+      DONATIONALERTS_SOCKET_URL: "ws://127.0.0.1/donation-alerts",
+      DONATIONALERTS_EVENTS_HEARTBEAT_MS: "10"
     }
   });
   const overlayInstance = await listen(overlayServer);
@@ -313,6 +321,14 @@ function createHangingDonationAlertsStub() {
 
     eventStream = openEventStream(overlayUrl, "/api/donationalerts/events");
     await eventStream.ready;
+    await waitForCondition(function () {
+      return eventStream.comments.length >= 2;
+    });
+    assert.deepStrictEqual(
+      eventStream.comments.slice(0, 2),
+      ["connected", "ping"],
+      "event stream sends an initial comment and heartbeat comments"
+    );
 
     fakeSocket.sockets[0].emit("open");
     assert.deepStrictEqual(fakeSocket.sockets[0].sent[0], {

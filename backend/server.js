@@ -11,6 +11,7 @@ const DEFAULT_PORT = 3000;
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_API_BASE_URL = "https://www.donationalerts.com/api/v1";
 const DEFAULT_SOCKET_URL = "wss://centrifugo.donationalerts.com/connection/websocket";
+const DEFAULT_EVENTS_HEARTBEAT_MS = 15000;
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -44,7 +45,7 @@ function createServer(options) {
     }
 
     if (request.url === "/api/donationalerts/events" && request.method === "GET") {
-      handleDonationAlertsEvents(request, response, memory);
+      handleDonationAlertsEvents(request, response, env, memory);
       return;
     }
 
@@ -84,7 +85,7 @@ async function handleDonationAlertsToken(request, response, env, memory, donatio
   }
 }
 
-function handleDonationAlertsEvents(request, response, memory) {
+function handleDonationAlertsEvents(request, response, env, memory) {
   if (!memory.donationAlertsAccessToken) {
     writeJson(response, 401, {
       error: "DonationAlerts access token is required."
@@ -95,17 +96,26 @@ function handleDonationAlertsEvents(request, response, memory) {
   response.writeHead(200, {
     "Content-Type": "text/event-stream; charset=utf-8",
     "Cache-Control": "no-cache",
-    "Connection": "keep-alive"
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no"
   });
-  response.write("\n");
+  response.write(": connected\n\n");
 
   memory.donationAlertsEventClients.push(response);
+  const heartbeatMs = Math.max(1, Number(env.DONATIONALERTS_EVENTS_HEARTBEAT_MS) || DEFAULT_EVENTS_HEARTBEAT_MS);
+  const heartbeat = setInterval(function () {
+    response.write(": ping\n\n");
+  }, heartbeatMs);
 
-  request.on("close", function () {
+  function cleanup() {
+    clearInterval(heartbeat);
     memory.donationAlertsEventClients = memory.donationAlertsEventClients.filter(function (client) {
       return client !== response;
     });
-  });
+  }
+
+  request.on("close", cleanup);
+  response.on("error", cleanup);
 }
 
 async function connectDonationAlerts(env, memory, donationAlertsSocketFactory) {

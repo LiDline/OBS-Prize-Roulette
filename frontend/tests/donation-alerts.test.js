@@ -174,6 +174,79 @@ vm.runInNewContext(
   assert.strictEqual(startedDonations[0].username, "donor");
   assert.strictEqual(startedDonations[0].currency, "RUB");
 
+  context.window.fetch = function (url, options) {
+    fetchCalls.push({
+      url,
+      options
+    });
+
+    if (url === "/api/donationalerts/auth") {
+      return Promise.resolve({
+        ok: true,
+        json: function () {
+          return Promise.resolve({
+            userId: 321,
+            socketConnectionToken: "socket-token"
+          });
+        }
+      });
+    }
+
+    return Promise.resolve({
+      ok: false,
+      status: 404,
+      json: function () {
+        return Promise.resolve({});
+      }
+    });
+  };
+  eventSources[0].listeners.error();
+  await flushPromises();
+
+  assert.strictEqual(
+    createdElements.some(function (element) {
+      return element.className === "donation-auth-panel";
+    }),
+    false,
+    "client keeps EventSource reconnecting when backend auth is still valid"
+  );
+  assert.strictEqual(eventSources[0].closed, undefined, "client does not close EventSource after transient stream errors");
+
+  context.window.fetch = function (url, options) {
+    fetchCalls.push({
+      url,
+      options
+    });
+
+    if (url === "/api/donationalerts/auth") {
+      return Promise.resolve({
+        ok: false,
+        status: 504,
+        json: function () {
+          return Promise.resolve({ error: "timeout" });
+        }
+      });
+    }
+
+    return Promise.resolve({
+      ok: false,
+      status: 404,
+      json: function () {
+        return Promise.resolve({});
+      }
+    });
+  };
+  eventSources[0].listeners.error();
+  await flushPromises();
+
+  assert.strictEqual(
+    createdElements.some(function (element) {
+      return element.className === "donation-auth-panel";
+    }),
+    false,
+    "client does not ask for relogin when auth probe fails without a 401"
+  );
+
   context.window.fetch = function () {
     return Promise.resolve({
       ok: false,
