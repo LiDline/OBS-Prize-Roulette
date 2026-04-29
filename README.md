@@ -8,29 +8,31 @@
 
 ## Запуск
 
-Добавьте `index.html` в OBS как локальный файл.
-Для проверки можно открыть `index.html` в браузере. В этом режиме будет
-использован встроенный конфиг из страницы.
+Для работы с внешним `config.json` и DonationAlerts запускайте проект через
+локальный Node-сервер.
 
-Пример итога:
+Сначала создайте локальный `.env` на основе примера:
 
-```text
-file:///home/lidline/Документы/test/OBS-Prize-Roulette/index.html
+```bash
+cp .env.example .env
 ```
 
-Для работы с внешним `config.json` лучше запускать проект через локальный
-статический сервер. Этот же URL можно добавить в OBS как Browser Source.
+Затем впишите OAuth access token в `DONATIONALERTS_ACCESS_TOKEN` и запустите:
+
+```bash
+node server.js
+```
 
 Пример обычной страницы:
 
 ```text
-http://localhost:8000/
+http://127.0.0.1:3000/
 ```
 
 Пример страницы с debug-панелью для ручной симуляции доната:
 
 ```text
-http://localhost:8000/?debug=1
+http://127.0.0.1:3000/?debug=1
 
 или:
 
@@ -96,10 +98,7 @@ node scripts/generate-uploaded-images-manifest.js
 ```json
 {
   "donationAlerts": {
-    "accessToken": "",
-    "userId": "",
-    "socketConnectionToken": "",
-    "apiBaseUrl": "https://www.donationalerts.com/api/v1",
+    "proxyBaseUrl": "/api/donationalerts",
     "socketUrl": "wss://centrifugo.donationalerts.com/connection/websocket",
     "autoReconnect": true,
     "reconnectDelayMs": 5000
@@ -107,19 +106,29 @@ node scripts/generate-uploaded-images-manifest.js
 }
 ```
 
-Минимально нужен `accessToken`. Если `userId` и `socketConnectionToken` не
-заполнены, приложение попробует получить их через DonationAlerts API.
+Браузерный конфиг содержит только адрес локального прокси и параметры WebSocket.
+OAuth access token не хранится в `config.json`: REST-запросы к DonationAlerts
+выполняет локальный `server.js`.
+
+Для подключения нужен `DONATIONALERTS_ACCESS_TOKEN` в `.env`. Сервер использует
+его, чтобы получить данные WebSocket через DonationAlerts API.
+
+Признак успешного подключения в консоли браузера:
+
+```text
+DonationAlerts channel subscribed: $alerts:donation_<userId>
+```
 
 ## Структура проекта
 
 ```text
 OBS-Prize-Roulette/
-|-- index.html                                # HTML-разметка оверлея, debug-панель и встроенный запасной конфиг
+|-- index.html                                # HTML-разметка оверлея и debug-панель
 |-- style.css                                 # Визуальное оформление рулетки
 |-- script.js                                 # Точка входа: инициализация, загрузка конфига, debug-панель, DonationAlerts
 |-- config.json                               # Основной внешний конфиг призов, весов, таймингов, звуков и DonationAlerts
 |-- js/
-|   |-- config.js                             # Загрузка и объединение внешнего, встроенного и fallback-конфига
+|   |-- config.js                             # Загрузка внешнего config.json и fallback-конфиг
 |   |-- debug.js                              # Логика debug-панели и ручной симуляции доната
 |   |-- donation-alerts.js                    # DonationAlerts API/WebSocket и запуск рулетки по донату
 |   |-- roulette.js                           # Выбор победителя, построение ленты, анимация и показ результата

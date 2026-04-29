@@ -6,13 +6,15 @@
 
   function initDonationAlerts() {
     var settings = state.config.donationAlerts || {};
-    var accessToken = typeof settings.accessToken === "string" ? settings.accessToken.trim() : "";
+    var hasProxy = typeof settings.proxyBaseUrl === "string" && settings.proxyBaseUrl.trim();
 
-    if (!accessToken) {
+    if (!hasProxy) {
       return;
     }
 
-    settings.accessToken = accessToken;
+    if (hasProxy) {
+      settings.proxyBaseUrl = settings.proxyBaseUrl.trim().replace(/\/+$/, "");
+    }
 
     if (typeof WebSocket === "undefined") {
       console.warn("DonationAlerts integration requires WebSocket support.");
@@ -56,26 +58,9 @@
   }
 
   async function resolveDonationAlertsAuth(settings) {
-    if (settings.userId && settings.socketConnectionToken) {
-      return {
-        userId: settings.userId,
-        socketConnectionToken: settings.socketConnectionToken
-      };
-    }
-
-    var profile = await donationAlertsApiRequest(settings, "/user/oauth", {
+    return donationAlertsProxyRequest(settings, "/auth", {
       method: "GET"
     });
-    var profileData = profile && profile.data ? profile.data : {};
-
-    if (!profileData.id || !profileData.socket_connection_token) {
-      throw new Error("DonationAlerts /user/oauth response does not contain id or socket_connection_token.");
-    }
-
-    return {
-      userId: profileData.id,
-      socketConnectionToken: profileData.socket_connection_token
-    };
   }
 
   async function handleDonationAlertsSocketMessage(rawData, settings, channel) {
@@ -102,7 +87,7 @@
 
   async function subscribeDonationAlertsChannel(settings, channel, clientId) {
     try {
-      var response = await donationAlertsApiRequest(settings, "/centrifuge/subscribe", {
+      var response = await donationAlertsProxyRequest(settings, "/subscribe", {
         method: "POST",
         body: JSON.stringify({
           channels: [channel],
@@ -132,18 +117,23 @@
     }
   }
 
-  async function donationAlertsApiRequest(settings, path, options) {
-    var response = await fetch(settings.apiBaseUrl + path, {
+  async function donationAlertsProxyRequest(settings, path, options) {
+    var fetchImpl = window.fetch || (typeof fetch === "function" ? fetch : null);
+
+    if (!fetchImpl) {
+      throw new Error("DonationAlerts integration requires fetch support.");
+    }
+
+    var response = await fetchImpl(settings.proxyBaseUrl + path, {
       method: options.method,
       headers: {
-        "Authorization": "Bearer " + settings.accessToken,
         "Content-Type": "application/json"
       },
       body: options.body || undefined
     });
 
     if (!response.ok) {
-      throw new Error("DonationAlerts API " + path + " failed with HTTP " + response.status);
+      throw new Error("DonationAlerts proxy " + path + " failed with HTTP " + response.status);
     }
 
     return response.json();

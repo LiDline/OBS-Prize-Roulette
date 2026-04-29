@@ -422,10 +422,7 @@
     }
   ],
   "donationAlerts": {
-    "accessToken": "",
-    "userId": "",
-    "socketConnectionToken": "",
-    "apiBaseUrl": "https://www.donationalerts.com/api/v1",
+    "proxyBaseUrl": "/api/donationalerts",
     "socketUrl": "wss://centrifugo.donationalerts.com/connection/websocket",
     "autoReconnect": true,
     "reconnectDelayMs": 5000

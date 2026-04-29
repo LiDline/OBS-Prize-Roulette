@@ -7,15 +7,6 @@
     resultDisplayMs: 3000,
     closeDelayMs: 800,
     sound: "assets/card-change.mp3",
-    donationAlerts: {
-      accessToken: "",
-      userId: "",
-      socketConnectionToken: "",
-      apiBaseUrl: "https://www.donationalerts.com/api/v1",
-      socketUrl: "wss://centrifugo.donationalerts.com/connection/websocket",
-      autoReconnect: true,
-      reconnectDelayMs: 5000
-    },
     prizes: [
       { id: 1, name: "Обычный приз", weight: 60 },
       { id: 2, name: "Редкий приз", weight: 25 },
@@ -25,10 +16,8 @@
   };
 
   async function loadConfig() {
-    var embeddedConfig = readEmbeddedConfig();
-
     if (window.location.protocol === "file:") {
-      return embeddedConfig || fallbackConfig;
+      return fallbackConfig;
     }
 
     try {
@@ -39,25 +28,10 @@
       }
 
       var loadedConfig = await response.json();
-      return mergeConfig(embeddedConfig || fallbackConfig, loadedConfig);
+      return mergeConfig(fallbackConfig, loadedConfig);
     } catch (error) {
-      console.warn("Failed to load config.json, using embedded or fallback config.", error);
-      return embeddedConfig || fallbackConfig;
-    }
-  }
-
-  function readEmbeddedConfig() {
-    var configElement = document.getElementById("rouletteConfig");
-
-    if (!configElement) {
-      return null;
-    }
-
-    try {
-      return mergeConfig(fallbackConfig, JSON.parse(configElement.textContent));
-    } catch (error) {
-      console.warn("Failed to parse embedded roulette config.", error);
-      return null;
+      console.warn("Failed to load config.json, using fallback config.", error);
+      return fallbackConfig;
     }
   }
 
@@ -68,9 +42,17 @@
       resultDisplayMs: readNumber(loadedConfig.resultDisplayMs, defaultConfig.resultDisplayMs),
       closeDelayMs: readNumber(loadedConfig.closeDelayMs, defaultConfig.closeDelayMs),
       sound: loadedConfig.sound || defaultConfig.sound,
-      donationAlerts: Object.assign({}, defaultConfig.donationAlerts, loadedConfig.donationAlerts || {}),
+      donationAlerts: mergeOptionalObject(defaultConfig.donationAlerts, loadedConfig.donationAlerts),
       prizes: Array.isArray(loadedConfig.prizes) ? loadedConfig.prizes : defaultConfig.prizes
     };
+  }
+
+  function mergeOptionalObject(defaultValue, loadedValue) {
+    if (!defaultValue && !loadedValue) {
+      return undefined;
+    }
+
+    return Object.assign({}, defaultValue || {}, loadedValue || {});
   }
 
   function readNumber(value, fallback) {
