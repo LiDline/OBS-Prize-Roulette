@@ -42,17 +42,8 @@
       resultDisplayMs: readNumber(loadedConfig.resultDisplayMs, defaultConfig.resultDisplayMs),
       closeDelayMs: readNumber(loadedConfig.closeDelayMs, defaultConfig.closeDelayMs),
       sound: loadedConfig.sound || defaultConfig.sound,
-      donationAlerts: mergeOptionalObject(defaultConfig.donationAlerts, loadedConfig.donationAlerts),
       prizes: Array.isArray(loadedConfig.prizes) ? loadedConfig.prizes : defaultConfig.prizes
     };
-  }
-
-  function mergeOptionalObject(defaultValue, loadedValue) {
-    if (!defaultValue && !loadedValue) {
-      return undefined;
-    }
-
-    return Object.assign({}, defaultValue || {}, loadedValue || {});
   }
 
   function readNumber(value, fallback) {

@@ -3,6 +3,7 @@ const fs = require("fs");
 const http = require("http");
 const os = require("os");
 const path = require("path");
+const EventEmitter = require("events");
 
 const server = require("../server");
 
@@ -99,6 +100,101 @@ function requestText(baseUrl, pathname) {
   });
 }
 
+function openEventStream(baseUrl, pathname) {
+  const requestUrl = new URL(baseUrl + pathname);
+  const events = [];
+
+  const stream = {
+    events,
+    close: function () {
+      if (stream.request) {
+        stream.request.destroy();
+      }
+    }
+  };
+
+  stream.ready = new Promise(function (resolve, reject) {
+    const request = http.request({
+      method: "GET",
+      hostname: requestUrl.hostname,
+      port: requestUrl.port,
+      path: requestUrl.pathname,
+      headers: {
+        Accept: "text/event-stream"
+      }
+    }, function (response) {
+      stream.response = response;
+      resolve(stream);
+
+      response.on("data", function (chunk) {
+        String(chunk).split(/\n\n/).forEach(function (eventBlock) {
+          if (!eventBlock.trim()) {
+            return;
+          }
+
+          const dataLine = eventBlock.split(/\n/).find(function (line) {
+            return line.indexOf("data: ") === 0;
+          });
+
+          if (dataLine) {
+            events.push(JSON.parse(dataLine.slice("data: ".length)));
+          }
+        });
+      });
+    });
+
+    request.on("error", reject);
+    request.end();
+    stream.request = request;
+  });
+
+  return stream;
+}
+
+function createFakeDonationAlertsSocketFactory() {
+  const sockets = [];
+
+  return {
+    sockets,
+    factory: function (url) {
+      const socket = new EventEmitter();
+      socket.url = url;
+      socket.sent = [];
+      socket.send = function (message) {
+        socket.sent.push(JSON.parse(message));
+      };
+      socket.close = function () {
+        socket.emit("close");
+      };
+      socket.addEventListener = socket.on.bind(socket);
+      sockets.push(socket);
+      return socket;
+    }
+  };
+}
+
+function waitForCondition(predicate) {
+  return new Promise(function (resolve, reject) {
+    const startedAt = Date.now();
+
+    function check() {
+      if (predicate()) {
+        resolve();
+        return;
+      }
+
+      if (Date.now() - startedAt > 1000) {
+        reject(new Error("Timed out waiting for condition."));
+        return;
+      }
+
+      setTimeout(check, 10);
+    }
+
+    check();
+  });
+}
+
 function createDonationAlertsStub() {
   const requests = [];
   const app = http.createServer(function (request, response) {
@@ -189,45 +285,81 @@ function createHangingDonationAlertsStub() {
   const donationAlerts = createDonationAlertsStub();
   const donationAlertsServer = await listen(donationAlerts.app);
   const donationAlertsUrl = "http://127.0.0.1:" + donationAlertsServer.address().port;
+  const fakeSocket = createFakeDonationAlertsSocketFactory();
 
   const overlayServer = server.createServer({
     rootDir: process.cwd(),
+    donationAlertsSocketFactory: fakeSocket.factory,
     env: {
-      DONATIONALERTS_API_BASE_URL: donationAlertsUrl
+      DONATIONALERTS_API_BASE_URL: donationAlertsUrl,
+      DONATIONALERTS_SOCKET_URL: "ws://127.0.0.1/donation-alerts"
     }
   });
   const overlayInstance = await listen(overlayServer);
   const overlayUrl = "http://127.0.0.1:" + overlayInstance.address().port;
+  let eventStream = null;
 
   try {
-    const auth = await requestJson(overlayUrl, "/api/donationalerts/auth", {
-      headers: { Authorization: "Bearer access-token" }
+    const token = await requestJson(overlayUrl, "/api/donationalerts/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken: "access-token" })
     });
-    assert.strictEqual(auth.status, 200, "auth endpoint responds with success");
-    assert.deepStrictEqual(auth.body, {
-      userId: 321,
-      socketConnectionToken: "socket-token"
+    assert.strictEqual(token.status, 200, "token endpoint stores access token in server memory");
+    assert.deepStrictEqual(token.body, { ok: true });
+
+    assert.strictEqual(fakeSocket.sockets.length, 1, "backend opens DonationAlerts socket after token is stored");
+    assert.strictEqual(fakeSocket.sockets[0].url, "ws://127.0.0.1/donation-alerts");
+
+    eventStream = openEventStream(overlayUrl, "/api/donationalerts/events");
+    await eventStream.ready;
+
+    fakeSocket.sockets[0].emit("open");
+    assert.deepStrictEqual(fakeSocket.sockets[0].sent[0], {
+      params: {
+        token: "socket-token"
+      },
+      id: 2
     });
 
-    const subscribe = await requestJson(overlayUrl, "/api/donationalerts/subscribe", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer access-token"
-      },
-      body: JSON.stringify({
-        channels: ["$alerts:donation_321"],
-        client: "client-id"
+    fakeSocket.sockets[0].emit("message", {
+      data: JSON.stringify({
+        result: {
+          client: "client-id"
+        }
       })
     });
-    assert.strictEqual(subscribe.status, 200, "subscribe endpoint responds with success");
-    assert.deepStrictEqual(subscribe.body, {
-      channels: [
-        {
-          channel: "$alerts:donation_321",
-          token: "channel-token"
+    await waitForCondition(function () {
+      return fakeSocket.sockets[0].sent.length === 2;
+    });
+    assert.deepStrictEqual(fakeSocket.sockets[0].sent[1], {
+      params: {
+        channel: "$alerts:donation_321",
+        token: "channel-token"
+      },
+      method: 1,
+      id: 3
+    });
+
+    fakeSocket.sockets[0].emit("message", {
+      data: JSON.stringify({
+        result: {
+          data: {
+            amount: 1000,
+            username: "donor",
+            currency: "RUB"
+          }
         }
-      ]
+      })
+    });
+    await waitForCondition(function () {
+      return eventStream.events.length === 1;
+    });
+    assert.deepStrictEqual(eventStream.events[0], {
+      amount: 1000,
+      username: "donor",
+      currency: "RUB",
+      id: null
     });
 
     assert.deepStrictEqual(
@@ -256,9 +388,12 @@ function createHangingDonationAlertsStub() {
           })
         }
       ],
-      "server sends authorized API requests to DonationAlerts"
+      "backend owns DonationAlerts API calls after token is stored"
     );
   } finally {
+    if (eventStream) {
+      eventStream.close();
+    }
     await close(overlayInstance);
     await close(donationAlertsServer);
   }
@@ -280,7 +415,7 @@ function createHangingDonationAlertsStub() {
 
   try {
     const envTokenAuth = await requestJson(envTokenOverlayUrl, "/api/donationalerts/auth");
-    assert.strictEqual(envTokenAuth.status, 401, "auth rejects requests without browser access token");
+    assert.strictEqual(envTokenAuth.status, 401, "auth rejects requests without memory access token");
     assert.deepStrictEqual(envTokenAuth.body, {
       error: "DonationAlerts access token is required."
     });
@@ -293,44 +428,85 @@ function createHangingDonationAlertsStub() {
   const browserTokenDonationAlerts = createDonationAlertsStub();
   const browserTokenDonationAlertsServer = await listen(browserTokenDonationAlerts.app);
   const browserTokenDonationAlertsUrl = "http://127.0.0.1:" + browserTokenDonationAlertsServer.address().port;
+  const browserTokenSocket = createFakeDonationAlertsSocketFactory();
   const browserTokenOverlayServer = server.createServer({
     rootDir: process.cwd(),
+    donationAlertsSocketFactory: browserTokenSocket.factory,
     env: {
-      DONATIONALERTS_API_BASE_URL: browserTokenDonationAlertsUrl
+      DONATIONALERTS_API_BASE_URL: browserTokenDonationAlertsUrl,
+      DONATIONALERTS_SOCKET_URL: "ws://127.0.0.1/donation-alerts"
     }
   });
   const browserTokenOverlayInstance = await listen(browserTokenOverlayServer);
   const browserTokenOverlayUrl = "http://127.0.0.1:" + browserTokenOverlayInstance.address().port;
 
   try {
-    const browserTokenAuth = await requestJson(browserTokenOverlayUrl, "/api/donationalerts/auth", {
-      headers: { Authorization: "Bearer browser-token" }
-    });
-    assert.strictEqual(browserTokenAuth.status, 200, "auth accepts browser-provided access token");
-
-    const browserTokenSubscribe = await requestJson(browserTokenOverlayUrl, "/api/donationalerts/subscribe", {
+    const token = await requestJson(browserTokenOverlayUrl, "/api/donationalerts/token", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer browser-token"
-      },
-      body: JSON.stringify({
-        channels: ["$alerts:donation_321"],
-        client: "client-id"
-      })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken: "browser-token" })
     });
-    assert.strictEqual(browserTokenSubscribe.status, 200, "subscribe accepts browser-provided access token");
+    assert.strictEqual(token.status, 200, "token endpoint accepts browser-provided access token once");
 
     assert.deepStrictEqual(
       browserTokenDonationAlerts.requests.map(function (request) {
         return request.authorization;
       }),
-      ["Bearer browser-token", "Bearer browser-token"],
-      "server forwards browser-provided access token to DonationAlerts"
+      ["Bearer browser-token"],
+      "server authenticates DonationAlerts once when token is stored"
     );
   } finally {
     await close(browserTokenOverlayInstance);
     await close(browserTokenDonationAlertsServer);
+  }
+
+  const restartedDonationAlerts = createDonationAlertsStub();
+  const restartedDonationAlertsServer = await listen(restartedDonationAlerts.app);
+  const restartedDonationAlertsUrl = "http://127.0.0.1:" + restartedDonationAlertsServer.address().port;
+  const beforeRestartSocket = createFakeDonationAlertsSocketFactory();
+  const beforeRestartOverlayServer = server.createServer({
+    rootDir: process.cwd(),
+    donationAlertsSocketFactory: beforeRestartSocket.factory,
+    env: {
+      DONATIONALERTS_API_BASE_URL: restartedDonationAlertsUrl,
+      DONATIONALERTS_SOCKET_URL: "ws://127.0.0.1/donation-alerts"
+    }
+  });
+  const beforeRestartOverlayInstance = await listen(beforeRestartOverlayServer);
+  const beforeRestartOverlayUrl = "http://127.0.0.1:" + beforeRestartOverlayInstance.address().port;
+
+  try {
+    const token = await requestJson(beforeRestartOverlayUrl, "/api/donationalerts/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken: "temporary-token" })
+    });
+    assert.strictEqual(token.status, 200, "first server instance stores token");
+  } finally {
+    await close(beforeRestartOverlayInstance);
+  }
+
+  const afterRestartOverlayServer = server.createServer({
+    rootDir: process.cwd(),
+    env: {
+      DONATIONALERTS_API_BASE_URL: restartedDonationAlertsUrl
+    }
+  });
+  const afterRestartOverlayInstance = await listen(afterRestartOverlayServer);
+  const afterRestartOverlayUrl = "http://127.0.0.1:" + afterRestartOverlayInstance.address().port;
+
+  try {
+    const requestsBeforeRestartAuth = restartedDonationAlerts.requests.length;
+    const authAfterRestart = await requestJson(afterRestartOverlayUrl, "/api/donationalerts/auth");
+    assert.strictEqual(authAfterRestart.status, 401, "new server instance starts without stored token");
+    assert.strictEqual(
+      restartedDonationAlerts.requests.length,
+      requestsBeforeRestartAuth,
+      "new server instance does not reuse old token"
+    );
+  } finally {
+    await close(afterRestartOverlayInstance);
+    await close(restartedDonationAlertsServer);
   }
 
   const hangingDonationAlertsServer = await listen(createHangingDonationAlertsStub());
@@ -346,9 +522,12 @@ function createHangingDonationAlertsStub() {
   const timeoutOverlayUrl = "http://127.0.0.1:" + timeoutOverlayInstance.address().port;
 
   try {
-    const timeoutResponse = await requestJson(timeoutOverlayUrl, "/api/donationalerts/auth", {
-      headers: { Authorization: "Bearer access-token" }
+    await requestJson(timeoutOverlayUrl, "/api/donationalerts/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken: "access-token" })
     });
+    const timeoutResponse = await requestJson(timeoutOverlayUrl, "/api/donationalerts/auth");
     assert.strictEqual(timeoutResponse.status, 504, "auth endpoint returns gateway timeout");
     assert.deepStrictEqual(timeoutResponse.body, {
       error: "DonationAlerts API /user/oauth timed out."

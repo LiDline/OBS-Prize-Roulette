@@ -4,6 +4,10 @@
 показывает анимированную ленту призов, выбирает победителя с учетом весов из
 конфига и может запускаться автоматически по донатам DonationAlerts.
 
+Пример работы рулетки:
+
+![alt text](frontend/image.png)
+
 Звук рулетки: https://freesound.org/people/Squirrel_404/sounds/683048/
 
 ## Запуск
@@ -48,10 +52,6 @@ http://127.0.0.1:3000/?debug=1
 
 Сделать тестовый донат можно [тут](https://www.donationalerts.com/dashboard/activity-feed/donations).
 Нажмите кнопку "Добавить сообщение".
-
-Пример работы рулетки:
-
-![alt text](frontend/image.png)
 
 ## Настройка работы рулетки
 
@@ -102,22 +102,19 @@ node backend/scripts/generate-uploaded-images-manifest.js
 
 ## DonationAlerts
 
-Настройки DonationAlerts находятся в блоке `donationAlerts` внутри
-`frontend/config.json`.
+Интеграция DonationAlerts находится на backend-стороне. Браузер проходит OAuth и
+передает access token в `/api/donationalerts/token`, далее слушает локальные события
+из `/api/donationalerts/events`.
 
-```json
-{
-  "donationAlerts": {
-    "applicationId": "",
-    "proxyBaseUrl": "/api/donationalerts",
-    "socketUrl": "wss://centrifugo.donationalerts.com/connection/websocket",
-    "autoReconnect": true,
-    "reconnectDelayMs": 5000
-  }
-}
+Опциональные backend-настройки можно задать в `.env`:
+
+```env
+DONATIONALERTS_API_BASE_URL=https://www.donationalerts.com/api/v1
+DONATIONALERTS_SOCKET_URL=wss://centrifugo.donationalerts.com/connection/websocket
+DONATIONALERTS_REQUEST_TIMEOUT_MS=10000
 ```
 
-Признак успешного подключения в консоли браузера:
+Признак успешного подключения в консоли сервера:
 
 ```text
 DonationAlerts channel subscribed: $alerts:donation_<userId>
@@ -135,7 +132,7 @@ OBS-Prize-Roulette/
 |   |-- js/
 |   |   |-- config.js                         # Загрузка внешнего config.json и fallback-конфиг
 |   |   |-- debug.js                          # Логика debug-панели и ручной симуляции доната
-|   |   |-- donation-alerts.js                # DonationAlerts API/WebSocket и запуск рулетки по донату
+|   |   |-- donation-alerts.js                # OAuth-передача токена backend и локальные события донатов
 |   |   |-- roulette.js                       # Выбор победителя, построение ленты, анимация и показ результата
 |   |   |-- state.js                          # Общее состояние приложения
 |   |   |-- uploaded-images.js                # Сгенерированный список доступных PNG-картинок из uploads
@@ -144,7 +141,7 @@ OBS-Prize-Roulette/
 |   |   `-- *.mp3                             # Звуки открытия, закрытия и результата
 |   `-- tests/                                # Тесты браузерной логики
 |-- backend/                                  # Node-сервер и серверные утилиты
-|   |-- server.js                             # Локальный сервер, API-прокси DonationAlerts и раздача статики
+|   |-- server.js                             # Локальный сервер, DonationAlerts API/WebSocket и раздача статики
 |   |-- scripts/
 |   |   `-- generate-uploaded-images-manifest.js
 |   `-- tests/                                # Тесты сервера и backend-скриптов

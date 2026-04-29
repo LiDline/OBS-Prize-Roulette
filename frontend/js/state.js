@@ -10,9 +10,7 @@
     elements: {},
     itemWidth: 238,
     donationAlerts: {
-      socket: null,
-      messageId: 1,
-      reconnectTimer: null,
+      events: null,
       authPanel: null
     }
   };

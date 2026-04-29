@@ -9,18 +9,20 @@ const socketListeners = {};
 const fetchCalls = [];
 const createdElements = [];
 const storedValues = {};
+const eventSources = [];
+const startedDonations = [];
 
-function MockWebSocket(url) {
+function MockEventSource(url) {
   this.url = url;
-  this.readyState = MockWebSocket.OPEN;
+  this.listeners = {};
+  eventSources.push(this);
 }
 
-MockWebSocket.OPEN = 1;
-MockWebSocket.prototype.addEventListener = function (eventName, callback) {
-  socketListeners[eventName] = callback;
+MockEventSource.prototype.addEventListener = function (eventName, callback) {
+  this.listeners[eventName] = callback;
 };
-MockWebSocket.prototype.send = function (message) {
-  sentSocketMessages.push(JSON.parse(message));
+MockEventSource.prototype.close = function () {
+  this.closed = true;
 };
 
 const context = {
@@ -29,7 +31,7 @@ const context = {
   fetch: function (url, options) {
     return context.window.fetch(url, options);
   },
-  WebSocket: MockWebSocket,
+  EventSource: MockEventSource,
   window: {
     document: {
       body: {
@@ -76,7 +78,7 @@ const context = {
       origin: "http://127.0.0.1:3000",
       pathname: "/",
       search: "",
-      hash: ""
+      hash: "#access_token=memory-token"
     },
     history: {
       replaceState: function () {}
@@ -86,8 +88,6 @@ const context = {
       state: {
         config: {
           donationAlerts: {
-            proxyBaseUrl: "/api/donationalerts",
-            socketUrl: "wss://centrifugo.donationalerts.com/connection/websocket",
             autoReconnect: false,
             reconnectDelayMs: 5000
           }
@@ -105,30 +105,11 @@ const context = {
         options
       });
 
-      if (url === "/api/donationalerts/auth") {
+      if (url === "/api/donationalerts/token") {
         return Promise.resolve({
           ok: true,
           json: function () {
-            return Promise.resolve({
-              userId: 321,
-              socketConnectionToken: "socket-token"
-            });
-          }
-        });
-      }
-
-      if (url === "/api/donationalerts/subscribe") {
-        return Promise.resolve({
-          ok: true,
-          json: function () {
-            return Promise.resolve({
-              channels: [
-                {
-                  channel: "$alerts:donation_321",
-                  token: "channel-token"
-                }
-              ]
-            });
+            return Promise.resolve({ ok: true });
           }
         });
       }
@@ -144,8 +125,10 @@ const context = {
   }
 };
 
-context.window.WebSocket = MockWebSocket;
-context.window.handleDonation = function () {};
+context.window.EventSource = MockEventSource;
+context.window.handleDonation = function (donation) {
+  startedDonations.push(donation);
+};
 context.document = context.window.document;
 
 function flushPromises() {
@@ -168,43 +151,28 @@ vm.runInNewContext(
     fetchCalls.map(function (call) {
       return call.url;
     }),
-    ["/api/donationalerts/auth"],
-    "client resolves auth through the local proxy endpoint"
+    ["/api/donationalerts/token"],
+    "client sends OAuth token to backend memory"
   );
+  assert.deepStrictEqual(storedValues, {}, "client does not persist DonationAlerts token in localStorage");
+  assert.strictEqual(fetchCalls[0].options.headers.Authorization, undefined, "token request does not echo token in Authorization header");
+  assert.deepStrictEqual(JSON.parse(fetchCalls[0].options.body), {
+    accessToken: "memory-token"
+  });
+  assert.strictEqual(eventSources.length, 1, "client opens local DonationAlerts event stream");
+  assert.strictEqual(eventSources[0].url, "/api/donationalerts/events");
 
-  socketListeners.open();
-  socketListeners.message({
+  eventSources[0].listeners.message({
     data: JSON.stringify({
-      result: {
-        client: "client-id"
-      }
+      amount: 1000,
+      username: "donor",
+      currency: "RUB"
     })
   });
-  await Promise.resolve();
-  await flushPromises();
-
-  assert.strictEqual(fetchCalls[1].url, "/api/donationalerts/subscribe");
-  assert.strictEqual(fetchCalls[1].options.headers.Authorization, undefined);
-  assert.deepStrictEqual(JSON.parse(fetchCalls[1].options.body), {
-    channels: ["$alerts:donation_321"],
-    client: "client-id"
-  });
-  assert.deepStrictEqual(sentSocketMessages, [
-    {
-      params: {
-        token: "socket-token"
-      },
-      id: 2
-    },
-    {
-      params: {
-        channel: "$alerts:donation_321",
-        token: "channel-token"
-      },
-      method: 1,
-      id: 3
-    }
-  ]);
+  assert.strictEqual(startedDonations.length, 1, "client starts roulette from local backend donation events");
+  assert.strictEqual(startedDonations[0].amount, 1000);
+  assert.strictEqual(startedDonations[0].username, "donor");
+  assert.strictEqual(startedDonations[0].currency, "RUB");
 
   context.window.fetch = function () {
     return Promise.resolve({
