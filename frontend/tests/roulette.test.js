@@ -78,6 +78,7 @@ function createElement(tagName) {
 }
 
 function createDocument() {
+  const listeners = {};
   const elements = {
     rouletteOverlay: createElement("div"),
     rouletteTitle: createElement("div"),
@@ -94,6 +95,20 @@ function createDocument() {
       return createElement("fragment");
     },
     createElement,
+    addEventListener: function (eventName, callback) {
+      listeners[eventName] = listeners[eventName] || [];
+      listeners[eventName].push(callback);
+    },
+    removeEventListener: function (eventName, callback) {
+      listeners[eventName] = (listeners[eventName] || []).filter(function (listener) {
+        return listener !== callback;
+      });
+    },
+    dispatchEvent: function (event) {
+      (listeners[event.type] || []).slice().forEach(function (listener) {
+        listener(event);
+      });
+    },
     getElementById: function (id) {
       return elements[id] || null;
     }
@@ -108,8 +123,16 @@ function loadRoulette(options) {
   const canceledAnimationFrames = new Set();
   let nextAnimationFrameId = 1;
   const playedSounds = [];
+  const warnings = [];
   const context = {
-    console,
+    console: {
+      error: console.error,
+      info: console.info,
+      log: console.log,
+      warn: function () {
+        warnings.push(Array.prototype.slice.call(arguments));
+      }
+    },
     document,
     window: {},
     requestAnimationFrame: function (callback) {
@@ -125,6 +148,10 @@ function loadRoulette(options) {
     Audio: function Audio(src) {
       playedSounds.push(src);
       this.play = function () {
+        if (options.playSound) {
+          return options.playSound(src);
+        }
+
         return Promise.resolve();
       };
     }
@@ -186,6 +213,7 @@ function loadRoulette(options) {
     }
   };
   context.playedSounds = playedSounds;
+  context.warnings = warnings;
 
   ["js/config.js", "js/state.js", "js/utils.js", "js/roulette.js"].forEach(function (file) {
     vm.runInNewContext(
@@ -404,3 +432,43 @@ assert.deepStrictEqual(
   ["assets/card-change.mp3"],
   "only the shared sound plays when the active card changes"
 );
+
+(async function testBlockedSoundRetriesAfterFirstUserGesture() {
+  let playAttempts = 0;
+  const blockedLoaded = loadRoulette({
+    playSound: function () {
+      playAttempts += 1;
+
+      if (playAttempts === 1) {
+        return Promise.reject(Object.assign(new Error("Autoplay blocked"), {
+          name: "NotAllowedError"
+        }));
+      }
+
+      return Promise.resolve();
+    }
+  });
+
+  const result = await blockedLoaded.app.utils.safePlaySound("assets/card-change.mp3");
+
+  assert.strictEqual(result, false, "blocked autoplay resolves as a skipped sound");
+  assert.deepStrictEqual(blockedLoaded.context.warnings, [], "autoplay blocks are not logged as sound failures");
+  assert.deepStrictEqual(
+    blockedLoaded.context.playedSounds,
+    ["assets/card-change.mp3"],
+    "blocked sound is attempted once before user interaction"
+  );
+
+  blockedLoaded.context.document.dispatchEvent({ type: "pointerdown" });
+  await Promise.resolve();
+
+  assert.deepStrictEqual(
+    blockedLoaded.context.playedSounds,
+    ["assets/card-change.mp3", "assets/card-change.mp3"],
+    "blocked sound retries after the first user interaction"
+  );
+}()).catch(function (error) {
+  process.nextTick(function () {
+    throw error;
+  });
+});
