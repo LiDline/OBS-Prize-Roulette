@@ -11,6 +11,7 @@
       connectLocalDonationAlertsEvents();
     }).catch(function (error) {
       console.error("DonationAlerts connection failed.", error);
+      showDonationAlertsStatusModal("error", "Не удалось подключить DonationAlerts");
       showDonationAlertsTokenPanel();
     });
   }
@@ -41,6 +42,8 @@
     if (window.history && typeof window.history.replaceState === "function") {
       window.history.replaceState(null, document.title, getDonationAlertsRedirectUrl());
     }
+
+    showDonationAlertsStatusModal("success", "DonationAlerts подключен");
 
     return true;
   }
@@ -187,6 +190,56 @@
 
     doc.body.appendChild(panel);
     state.donationAlerts.authPanel = panel;
+  }
+
+  function showDonationAlertsStatusModal(type, message) {
+    var doc = window.document || document;
+    var modal;
+    var text;
+    var closeButton;
+    var closeModal;
+
+    if (!doc || !doc.body) {
+      return;
+    }
+
+    if (state.donationAlerts.statusModal && typeof state.donationAlerts.statusModal.remove === "function") {
+      state.donationAlerts.statusModal.remove();
+    }
+
+    modal = doc.createElement("section");
+    modal.className = "donation-auth-status-modal donation-auth-status-modal-" + type;
+
+    text = doc.createElement("span");
+    text.className = "donation-auth-status-message";
+    text.textContent = message;
+    modal.appendChild(text);
+
+    closeModal = function () {
+      if (state.donationAlerts.statusModal !== modal) {
+        return;
+      }
+
+      if (typeof modal.remove === "function") {
+        modal.remove();
+      }
+
+      state.donationAlerts.statusModal = null;
+    };
+
+    closeButton = doc.createElement("button");
+    closeButton.type = "button";
+    closeButton.className = "donation-auth-status-close";
+    closeButton.textContent = "Закрыть";
+    closeButton.addEventListener("click", closeModal);
+    modal.appendChild(closeButton);
+
+    doc.body.appendChild(modal);
+    state.donationAlerts.statusModal = modal;
+
+    if (typeof window.setTimeout === "function") {
+      window.setTimeout(closeModal, 3000);
+    }
   }
 
   function getDonationAlertsRedirectUrl() {

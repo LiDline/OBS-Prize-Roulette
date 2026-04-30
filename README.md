@@ -83,22 +83,9 @@ http://127.0.0.1:3000/?debug=1
 
 ```text
 frontend/config.json: "name": "Wyvern"
-uploads:     Wyvern.png
+
+uploads:              Wyvern.png
 ```
-
-Перед запуском оверлей не сканирует папку `uploads` сам. Вместо этого он читает
-готовый список файлов из `frontend/js/uploaded-images.js`. Этот файл генерируется
-скриптом `generate-uploaded-images-manifest.js`.
-
-Запуск скрипта:
-
-```bash
-node backend/scripts/generate-uploaded-images-manifest.js
-```
-
-Запускайте скрипт каждый раз после добавления, удаления или переименования PNG в
-`uploads`. Иначе оверлей может не увидеть новую картинку и покажет текстовое
-название приза.
 
 ## DonationAlerts
 

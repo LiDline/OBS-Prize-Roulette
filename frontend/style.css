@@ -300,6 +300,59 @@ input {
   pointer-events: auto;
 }
 
+.donation-auth-status-modal {
+  position: fixed;
+  z-index: 35;
+  top: 18px;
+  left: 50%;
+  display: flex;
+  min-width: 280px;
+  max-width: min(420px, calc(100vw - 32px));
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 8px;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  pointer-events: auto;
+  transform: translateX(-50%);
+}
+
+.donation-auth-status-modal-success {
+  background: rgba(18, 122, 83, 0.94);
+}
+
+.donation-auth-status-modal-error {
+  background: rgba(160, 47, 47, 0.94);
+}
+
+.donation-auth-status-message {
+  min-width: 0;
+}
+
+.donation-auth-status-close {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.donation-auth-status-close:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
 .donation-auth-panel strong {
   font-size: 16px;
   line-height: 1.2;

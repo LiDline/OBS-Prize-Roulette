@@ -260,6 +260,33 @@ function createHangingDonationAlertsStub() {
 }
 
 (async function () {
+  const startupRoot = fs.mkdtempSync(path.join(os.tmpdir(), "roulette-startup-"));
+  const startupFrontendDir = path.join(startupRoot, "frontend");
+  const startupUploadsDir = path.join(startupRoot, "uploads");
+  fs.mkdirSync(startupFrontendDir, { recursive: true });
+  fs.mkdirSync(startupUploadsDir);
+  fs.writeFileSync(path.join(startupFrontendDir, "index.html"), "<!doctype html><title>startup</title>");
+  fs.writeFileSync(path.join(startupUploadsDir, "Startup Prize.png"), "png");
+
+  const startupInstance = await server.startServer({
+    rootDir: startupRoot,
+    host: "127.0.0.1",
+    port: 0,
+    log: function () {}
+  });
+  const startupUrl = "http://127.0.0.1:" + startupInstance.address().port;
+
+  try {
+    const manifest = await requestText(startupUrl, "/js/uploaded-images.js");
+    assert.strictEqual(manifest.status, 200, "startup serves generated image manifest");
+    assert.ok(
+      manifest.body.indexOf("\"uploads/Startup Prize.png\"") !== -1,
+      "startup refreshes uploaded image manifest before serving frontend"
+    );
+  } finally {
+    await close(startupInstance);
+  }
+
   const staticRoot = fs.mkdtempSync(path.join(os.tmpdir(), "roulette-static-"));
   const frontendDir = path.join(staticRoot, "frontend");
   const uploadsDir = path.join(staticRoot, "uploads");

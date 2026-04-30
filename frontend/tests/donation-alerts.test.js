@@ -11,6 +11,7 @@ const createdElements = [];
 const storedValues = {};
 const eventSources = [];
 const startedDonations = [];
+const timeoutCalls = [];
 
 function MockEventSource(url) {
   this.url = url;
@@ -51,8 +52,12 @@ const context = {
           href: "",
           target: "",
           rel: "",
+          removed: false,
           appendChild: function (child) {
             this.children.push(child);
+          },
+          remove: function () {
+            this.removed = true;
           },
           addEventListener: function (eventName, callback) {
             this["on" + eventName] = callback;
@@ -83,7 +88,17 @@ const context = {
     history: {
       replaceState: function () {}
     },
-    setTimeout,
+    setTimeout: function (callback, delay) {
+      var timeoutId = timeoutCalls.length + 1;
+
+      timeoutCalls.push({
+        id: timeoutId,
+        callback,
+        delay
+      });
+
+      return timeoutId;
+    },
     RouletteApp: {
       state: {
         config: {
@@ -161,6 +176,24 @@ vm.runInNewContext(
   });
   assert.strictEqual(eventSources.length, 1, "client opens local DonationAlerts event stream");
   assert.strictEqual(eventSources[0].url, "/api/donationalerts/events");
+  assert.ok(
+    createdElements.some(function (element) {
+      return element.className === "donation-auth-status-message" &&
+        element.textContent === "DonationAlerts подключен";
+    }),
+    "client shows success modal after DonationAlerts login"
+  );
+  var successStatusModal = createdElements.find(function (element) {
+    return element.className === "donation-auth-status-modal donation-auth-status-modal-success";
+  });
+  assert.strictEqual(timeoutCalls[0].delay, 3000, "client schedules DonationAlerts success modal auto-close after 3 seconds");
+  timeoutCalls[0].callback();
+  assert.strictEqual(successStatusModal.removed, true, "client closes DonationAlerts success modal after 3 seconds");
+  assert.strictEqual(
+    context.window.RouletteApp.state.donationAlerts.statusModal,
+    null,
+    "client clears DonationAlerts status modal state after auto-close"
+  );
 
   eventSources[0].listeners.message({
     data: JSON.stringify({
@@ -263,6 +296,10 @@ vm.runInNewContext(
   var authPanel = createdElements.find(function (element) {
     return element.className === "donation-auth-panel";
   });
+  var errorStatusModal = createdElements.find(function (element) {
+    return element.className === "donation-auth-status-message" &&
+      element.textContent === "Не удалось подключить DonationAlerts";
+  });
   var panelInputs = createdElements.filter(function (element) {
     return element.tagName === "INPUT";
   });
@@ -271,6 +308,13 @@ vm.runInNewContext(
   });
 
   assert.ok(authPanel, "client shows DonationAlerts token panel when auth fails");
+  assert.ok(errorStatusModal, "client shows error modal after DonationAlerts login fails");
+  var errorStatusModalPanel = createdElements.find(function (element) {
+    return element.className === "donation-auth-status-modal donation-auth-status-modal-error";
+  });
+  assert.strictEqual(timeoutCalls[1].delay, 3000, "client schedules DonationAlerts error modal auto-close after 3 seconds");
+  timeoutCalls[1].callback();
+  assert.strictEqual(errorStatusModalPanel.removed, true, "client closes DonationAlerts error modal after 3 seconds");
   assert.strictEqual(panelInputs[0].value, "", "token panel leaves application id empty");
   assert.strictEqual(panelInputs[0].readOnly, false, "token panel lets the user edit application id");
   assert.strictEqual(panelInputs[1].value, "http://127.0.0.1:3000/", "token panel shows redirect url");

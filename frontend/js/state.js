@@ -11,7 +11,8 @@
     itemWidth: 238,
     donationAlerts: {
       events: null,
-      authPanel: null
+      authPanel: null,
+      statusModal: null
     }
   };
 }(window));
