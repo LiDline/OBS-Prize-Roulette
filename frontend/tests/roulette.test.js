@@ -124,6 +124,7 @@ function loadRoulette(options) {
   let nextAnimationFrameId = 1;
   const playedSounds = [];
   const warnings = [];
+  const fetchCalls = [];
   const context = {
     console: {
       error: console.error,
@@ -158,6 +159,23 @@ function loadRoulette(options) {
   };
 
   context.window.document = document;
+  context.window.fetch = function (url, requestOptions) {
+    fetchCalls.push({
+      url,
+      options: requestOptions
+    });
+
+    if (options.fetch) {
+      return options.fetch(url, requestOptions);
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: function () {
+        return Promise.resolve({ ok: true });
+      }
+    });
+  };
   context.window.setTimeout = function (callback) {
     pendingTimers.push(callback);
     return pendingTimers.length;
@@ -214,6 +232,7 @@ function loadRoulette(options) {
   };
   context.playedSounds = playedSounds;
   context.warnings = warnings;
+  context.fetchCalls = fetchCalls;
 
   ["js/config.js", "js/state.js", "js/utils.js", "js/roulette.js"].forEach(function (file) {
     vm.runInNewContext(
@@ -409,6 +428,72 @@ assert.strictEqual(
   donorCounterLoaded.app.state.elements.title.textContent,
   "Рулетка призов для testName · 1/3",
   "roulette title shows donation spin counter"
+);
+
+const donationResultLoaded = loadRoulette();
+donationResultLoaded.app.state.config = Object.assign({}, donationResultLoaded.app.state.config, {
+  prizes: [
+    { id: 9, name: "CSV Prize", weight: 1 }
+  ],
+  resultDisplayMs: 0,
+  closeDelayMs: 0
+});
+
+assert.strictEqual(
+  donationResultLoaded.app.roulette.startRoulette({
+    donorName: "csvDonor",
+    donationAmount: 1500,
+    spinIndex: 2,
+    spinCount: 3
+  }),
+  true,
+  "spin starts with donation result context"
+);
+
+finishSpin(donationResultLoaded);
+
+assert.strictEqual(donationResultLoaded.context.fetchCalls.length, 1, "roulette reports donation result to backend");
+assert.strictEqual(donationResultLoaded.context.fetchCalls[0].url, "/api/donation-results");
+assert.strictEqual(donationResultLoaded.context.fetchCalls[0].options.method, "POST");
+assert.deepStrictEqual(
+  JSON.parse(donationResultLoaded.context.fetchCalls[0].options.body),
+  {
+    donorName: "csvDonor",
+    donationAmount: 1500,
+    spinIndex: 2,
+    spinCount: 3,
+    prizeId: 9,
+    prizeName: "CSV Prize"
+  },
+  "roulette reports donor and prize data"
+);
+
+const anonymousDonationResultLoaded = loadRoulette();
+anonymousDonationResultLoaded.app.state.config = Object.assign({}, anonymousDonationResultLoaded.app.state.config, {
+  prizes: [
+    { id: 10, name: "Anonymous Prize", weight: 1 }
+  ],
+  resultDisplayMs: 0,
+  closeDelayMs: 0
+});
+
+assert.strictEqual(
+  anonymousDonationResultLoaded.app.roulette.startRoulette({
+    donorName: "",
+    donationAmount: 500,
+    spinIndex: 1,
+    spinCount: 1
+  }),
+  true,
+  "spin starts with anonymous donation result context"
+);
+
+finishSpin(anonymousDonationResultLoaded);
+
+assert.strictEqual(
+  anonymousDonationResultLoaded.context.fetchCalls.length,
+  1,
+  "roulette reports anonymous donation result to backend"
 );
 
 loaded.app.state.config = Object.assign({}, loaded.app.state.config, {

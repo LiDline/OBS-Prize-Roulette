@@ -7,6 +7,7 @@ const {
   handleDonationAlertsSubscribe,
   handleDonationAlertsToken
 } = require("./donationalerts");
+const { handleDonationResult } = require("./donation-results");
 const { parseEnvFile } = require("./env");
 const { serveStaticRequest } = require("./static");
 const { createWebSocketClient } = require("./websocket-client");
@@ -17,6 +18,7 @@ function createServer(options) {
   const projectRoot = options.rootDir || path.resolve(__dirname, "..", "..");
   const frontendDir = options.frontendDir || path.join(projectRoot, "frontend");
   const uploadsDir = options.uploadsDir || path.join(projectRoot, "uploads");
+  const donationResultsCsvPath = options.donationResultsCsvPath || path.join(projectRoot, "donation-results.csv");
   const env = Object.assign({}, parseEnvFile(path.join(projectRoot, ".env")), process.env, options.env || {});
   const donationAlertsSocketFactory = options.donationAlertsSocketFactory || createWebSocketClient;
   const memory = {
@@ -44,6 +46,14 @@ function createServer(options) {
 
     if (request.url === "/api/donationalerts/subscribe" && request.method === "POST") {
       handleDonationAlertsSubscribe(request, response, env, memory);
+      return;
+    }
+
+    if (request.url === "/api/donation-results" && request.method === "POST") {
+      handleDonationResult(request, response, {
+        csvPath: donationResultsCsvPath,
+        now: options.now
+      });
       return;
     }
 

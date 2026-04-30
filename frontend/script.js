@@ -35,6 +35,7 @@
       for (var i = 0; i < spinCount; i += 1) {
         app.roulette.startRoulette({
           donorName: donationData.username,
+          donationAmount: numericAmount,
           spinIndex: i + 1,
           spinCount: spinCount
         });

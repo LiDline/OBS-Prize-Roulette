@@ -316,6 +316,51 @@ function createHangingDonationAlertsStub() {
     await close(staticOverlayInstance);
   }
 
+  const resultsRoot = fs.mkdtempSync(path.join(os.tmpdir(), "roulette-results-"));
+  const resultsFrontendDir = path.join(resultsRoot, "frontend");
+  const resultsUploadsDir = path.join(resultsRoot, "uploads");
+  fs.mkdirSync(resultsFrontendDir);
+  fs.mkdirSync(resultsUploadsDir);
+  fs.writeFileSync(path.join(resultsFrontendDir, "index.html"), "<!doctype html><title>results</title>");
+
+  const resultsOverlayServer = server.createServer({
+    rootDir: resultsRoot,
+    frontendDir: resultsFrontendDir,
+    uploadsDir: resultsUploadsDir,
+    now: function () {
+      return new Date("2026-04-30T00:00:00.000Z");
+    },
+    env: {}
+  });
+  const resultsOverlayInstance = await listen(resultsOverlayServer);
+  const resultsOverlayUrl = "http://127.0.0.1:" + resultsOverlayInstance.address().port;
+  const resultsCsvPath = path.join(resultsRoot, "donation-results.csv");
+
+  try {
+    const resultResponse = await requestJson(resultsOverlayUrl, "/api/donation-results", {
+      method: "POST",
+      body: JSON.stringify({
+        donorName: "test, donor",
+        donationAmount: 1000,
+        spinIndex: 2,
+        spinCount: 3,
+        prizeId: 7,
+        prizeName: "Prize \"A\""
+      })
+    });
+
+    assert.strictEqual(resultResponse.status, 200, "donation result endpoint accepts result rows");
+    assert.deepStrictEqual(resultResponse.body, { ok: true });
+    assert.strictEqual(
+      fs.readFileSync(resultsCsvPath, "utf8"),
+      "created_at,donor_name,donation_amount,spin_index,spin_count,prize_id,prize_name\n" +
+        "\"2026-04-30T00:00:00.000Z\",\"test, donor\",\"1000\",\"2\",\"3\",\"7\",\"Prize \"\"A\"\"\"\n",
+      "donation result endpoint appends escaped csv rows"
+    );
+  } finally {
+    await close(resultsOverlayInstance);
+  }
+
   const donationAlerts = createDonationAlertsStub();
   const donationAlertsServer = await listen(donationAlerts.app);
   const donationAlertsUrl = "http://127.0.0.1:" + donationAlertsServer.address().port;

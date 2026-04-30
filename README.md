@@ -1,8 +1,9 @@
 # OBS-Prize-Roulette
 
-Рулетка с выпадением призов по War Thunder для OBS-оверлея. Оверлей
-показывает анимированную ленту призов, выбирает победителя с учетом весов из
-конфига и может запускаться автоматически по донатам DonationAlerts.
+Рулетка с выпадением призов по War Thunder для OBS-оверлея по донатам DonationAlerts.
+
+Результаты прокруток по донатам сохраняются в `donation-results.csv` в корне
+проекта.
 
 Пример работы рулетки:
 
@@ -84,10 +85,10 @@ http://127.0.0.1:3000/?debug=1
 ```text
 frontend/config.json: "name": "Wyvern"
 
-uploads:              Wyvern.png
+uploads: Wyvern.png
 ```
 
-## DonationAlerts
+### DonationAlerts
 
 Интеграция DonationAlerts находится на backend-стороне. Браузер проходит OAuth и
 передает access token в `/api/donationalerts/token`, далее слушает локальные события

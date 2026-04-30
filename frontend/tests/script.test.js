@@ -82,6 +82,13 @@ assert.deepStrictEqual(
 );
 assert.deepStrictEqual(
   loaded.startedSpins.map(function (spinContext) {
+    return spinContext.donationAmount;
+  }),
+  [1000, 1000],
+  "each spin keeps donation amount context"
+);
+assert.deepStrictEqual(
+  loaded.startedSpins.map(function (spinContext) {
     return {
       spinIndex: spinContext.spinIndex,
       spinCount: spinContext.spinCount

@@ -185,6 +185,7 @@
 
     return {
       donorName: spinContext.donorName || "",
+      donationAmount: Number(spinContext.donationAmount),
       spinIndex: Math.max(0, Math.floor(Number(spinContext.spinIndex) || 0)),
       spinCount: Math.max(0, Math.floor(Number(spinContext.spinCount) || 0))
     };
@@ -206,7 +207,7 @@
     track.style.transform = "translate3d(" + (finalX - stopOffset) + "px, 0, 0)";
 
     window.setTimeout(function () {
-      showResult(winner);
+      showResult(winner, spinContext);
     }, duration + 80);
   }
 
@@ -219,10 +220,11 @@
     return minOffset + Math.random() * (maxOffset - minOffset);
   }
 
-  function showResult(winner) {
+  function showResult(winner, spinContext) {
     stopCardChangeSoundWatcher();
     state.elements.resultName.textContent = winner.name || "Приз";
     state.elements.resultPanel.classList.add("is-visible");
+    reportDonationResult(winner, spinContext);
 
     window.setTimeout(function () {
       window.setTimeout(function () {
@@ -231,6 +233,35 @@
         startNextQueuedSpin();
       }, Math.max(0, Number(state.config.closeDelayMs) || 0));
     }, Math.max(0, Number(state.config.resultDisplayMs) || fallbackConfig.resultDisplayMs));
+  }
+
+  function reportDonationResult(winner, spinContext) {
+    var fetchImpl = window.fetch || (typeof fetch === "function" ? fetch : null);
+
+    if (!fetchImpl || !spinContext || !Number.isFinite(spinContext.donationAmount)) {
+      return;
+    }
+
+    fetchImpl("/api/donation-results", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        donorName: spinContext.donorName,
+        donationAmount: spinContext.donationAmount,
+        spinIndex: spinContext.spinIndex,
+        spinCount: spinContext.spinCount,
+        prizeId: winner.id || "",
+        prizeName: winner.name || "Приз"
+      })
+    }).then(function (response) {
+      if (response && response.ok === false) {
+        throw new Error("Donation result save failed with HTTP " + response.status);
+      }
+    }).catch(function (error) {
+      console.error("Donation result save failed.", error);
+    });
   }
 
   function startCardChangeSoundWatcher(track) {
@@ -334,7 +365,7 @@
       : "Рулетка призов";
 
     if (spinCount > 1 && spinIndex > 0) {
-      title += " - " + spinIndex + "/" + spinCount;
+      title += " · " + spinIndex + "/" + spinCount;
     }
 
     state.elements.title.textContent = title;
