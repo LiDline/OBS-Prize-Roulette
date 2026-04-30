@@ -1,11 +1,7 @@
 # OBS-Prize-Roulette
 
-Рулетка с выпадением призов по War Thunder для OBS-оверлея по донатам DonationAlerts.
-
-Результаты прокруток по донатам сохраняются в `donation-results.csv` в корне
-проекта.
-
-Пример работы рулетки:
+Рулетка с выпадением призов по War Thunder для OBS-оверлея по донатам DonationAlerts. Результаты прокруток по донатам сохраняются в `donation-results.csv` в корне
+проекта. Пример работы рулетки:
 
 ![alt text](frontend/image.png)
 

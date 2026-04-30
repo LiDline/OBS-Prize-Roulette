@@ -6,6 +6,7 @@ const vm = require("vm");
 
 const sentSocketMessages = [];
 const socketListeners = {};
+const styleCss = fs.readFileSync(path.join(__dirname, "..", "style.css"), "utf8");
 const fetchCalls = [];
 const createdElements = [];
 const storedValues = {};
@@ -150,6 +151,10 @@ function flushPromises() {
   return new Promise(function (resolve) {
     setImmediate(resolve);
   });
+}
+
+function getElementText(element) {
+  return (element.textContent || "") + element.children.map(getElementText).join("");
 }
 
 vm.runInNewContext(
@@ -306,6 +311,15 @@ vm.runInNewContext(
   var authLink = createdElements.find(function (element) {
     return element.tagName === "A" && element.textContent === "Получить токен";
   });
+  var helpTrigger = createdElements.find(function (element) {
+    return element.className === "donation-auth-help-trigger" && element.textContent === "?";
+  });
+  var helpTooltip = createdElements.find(function (element) {
+    return element.className === "donation-auth-help-tooltip";
+  });
+  var helpLink = createdElements.find(function (element) {
+    return element.tagName === "A" && element.textContent === "тут";
+  });
 
   assert.ok(authPanel, "client shows DonationAlerts token panel when auth fails");
   assert.ok(errorStatusModal, "client shows error modal after DonationAlerts login fails");
@@ -319,6 +333,26 @@ vm.runInNewContext(
   assert.strictEqual(panelInputs[0].readOnly, false, "token panel lets the user edit application id");
   assert.strictEqual(panelInputs[1].value, "http://127.0.0.1:3000/", "token panel shows redirect url");
   assert.strictEqual(panelInputs[1].readOnly, true, "token panel keeps redirect url read-only");
+  assert.ok(helpTrigger, "token panel shows application id help trigger");
+  assert.ok(helpTooltip, "token panel includes application id help tooltip");
+  assert.strictEqual(
+    getElementText(helpTooltip),
+    "Создать ID приложения можно тут. URL редиректа укажите http://127.0.0.1:3000/",
+    "application id help tooltip explains where to create app and which redirect url to use"
+  );
+  assert.strictEqual(
+    helpLink.href,
+    "https://www.donationalerts.com/application/clients",
+    "application id help tooltip links to DonationAlerts clients"
+  );
+  assert.ok(
+    /\.donation-auth-help\s*\{[^}]*margin-left:\s*auto;/s.test(styleCss),
+    "application id help trigger is aligned to the right edge"
+  );
+  assert.ok(
+    /\.donation-auth-help::before\s*\{[^}]*position:\s*absolute;[^}]*height:\s*8px;/s.test(styleCss),
+    "application id help tooltip keeps hover active between trigger and tooltip"
+  );
 
   panelInputs[0].value = "18762";
   panelInputs[0].oninput();

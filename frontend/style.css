@@ -365,6 +365,75 @@ input {
   color: rgba(255, 255, 255, 0.78);
 }
 
+.donation-auth-label-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.donation-auth-help {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.donation-auth-help::before {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  width: 280px;
+  height: 8px;
+  content: "";
+}
+
+.donation-auth-help-trigger {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  color: #fff;
+  cursor: help;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.donation-auth-help-tooltip {
+  position: absolute;
+  z-index: 1;
+  bottom: calc(100% + 8px);
+  right: 0;
+  width: 280px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(8, 10, 16, 0.96);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.donation-auth-help-tooltip a {
+  color: #a8d8ff;
+  font-weight: 700;
+}
+
+.donation-auth-help:hover .donation-auth-help-tooltip,
+.donation-auth-help:focus-within .donation-auth-help-tooltip {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 .donation-auth-row input {
   width: 100%;
   min-height: 34px;
