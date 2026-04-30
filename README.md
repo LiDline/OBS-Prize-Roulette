@@ -46,7 +46,7 @@ http://127.0.0.1:3000/?debug=1
 
 ### 3. DonationAlerts
 
-Создать ID приложения можно [тут](https://www.donationalerts.com/application/clients).
+Создать ID приложения можно [тут](https://www.donationalerts.com/application/clients). URL редиректа укажите `http://127.0.0.1:3000/` (либо свой из .env).
 
 Когда откроете страницу рулетки, она попросит ранее созданное ID приложения. Вставьте ID, нажмите кнопку авторизации и разрешите доступ.
 
@@ -141,7 +141,15 @@ OBS-Prize-Roulette/
 |   |   `-- *.mp3                             # Звуки открытия, закрытия и результата
 |   `-- tests/                                # Тесты браузерной логики
 |-- backend/                                  # Node-сервер и серверные утилиты
-|   |-- server.js                             # Локальный сервер, DonationAlerts API/WebSocket и раздача статики
+|   |-- server.js                             # Точка входа сервера и публичные экспорты для тестов
+|   |-- src/
+|   |   |-- app.js                            # Создание HTTP-сервера, маршрутизация API и статики
+|   |   |-- constants.js                      # Общие настройки по умолчанию
+|   |   |-- donationalerts.js                 # DonationAlerts API, SSE-события и обработка socket-сообщений
+|   |   |-- env.js                            # Чтение .env-файла
+|   |   |-- http-response.js                  # JSON/text HTTP-ответы
+|   |   |-- static.js                         # Раздача frontend и uploads
+|   |   `-- websocket-client.js               # Минимальный WebSocket-клиент для DonationAlerts
 |   |-- scripts/
 |   |   `-- generate-uploaded-images-manifest.js
 |   `-- tests/                                # Тесты сервера и backend-скриптов

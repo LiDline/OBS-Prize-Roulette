@@ -334,7 +334,7 @@
       : "Рулетка призов";
 
     if (spinCount > 1 && spinIndex > 0) {
-      title += " · " + spinIndex + "/" + spinCount;
+      title += " - " + spinIndex + "/" + spinCount;
     }
 
     state.elements.title.textContent = title;
