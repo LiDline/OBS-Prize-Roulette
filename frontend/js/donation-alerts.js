@@ -5,6 +5,7 @@
   var state = app.state;
   var PROXY_BASE_URL = "/api/donationalerts";
   var APPLICATION_ID_STORAGE_KEY = "donationAlertsApplicationId";
+  var ACCESS_TOKEN_STORAGE_KEY = "donationAlertsAccessToken";
   var authCheckInFlight = false;
 
   function initDonationAlerts() {
@@ -21,30 +22,46 @@
     var hash = window.location && window.location.hash ? window.location.hash.replace(/^#/, "") : "";
     var params;
     var token;
+    var tokenFromHash = false;
 
-    if (!hash) {
-      return null;
+    if (hash) {
+      params = new URLSearchParams(hash);
+      token = params.get("access_token");
+      tokenFromHash = Boolean(token);
     }
 
-    params = new URLSearchParams(hash);
-    token = params.get("access_token");
+    if (!token) {
+      token = readSavedDonationAlertsAccessToken();
+    }
 
     if (!token) {
       return null;
     }
 
-    await donationAlertsProxyRequest("/token", {
-      method: "POST",
-      body: JSON.stringify({
-        accessToken: token
-      })
-    });
+    try {
+      await donationAlertsProxyRequest("/token", {
+        method: "POST",
+        body: JSON.stringify({
+          accessToken: token
+        })
+      });
+    } catch (error) {
+      if (!tokenFromHash) {
+        removeSavedDonationAlertsAccessToken();
+      }
 
-    if (window.history && typeof window.history.replaceState === "function") {
+      throw error;
+    }
+
+    saveDonationAlertsAccessToken(token);
+
+    if (tokenFromHash && window.history && typeof window.history.replaceState === "function") {
       window.history.replaceState(null, document.title, getDonationAlertsRedirectUrl());
     }
 
-    showDonationAlertsStatusModal("success", "DonationAlerts подключен");
+    if (tokenFromHash) {
+      showDonationAlertsStatusModal("success", "DonationAlerts подключен");
+    }
 
     return true;
   }
@@ -317,6 +334,43 @@
       window.localStorage.setItem(APPLICATION_ID_STORAGE_KEY, applicationId || "");
     } catch (error) {
       console.warn("DonationAlerts application id could not be saved to localStorage.", error);
+    }
+  }
+
+  function readSavedDonationAlertsAccessToken() {
+    try {
+      if (!window.localStorage) {
+        return "";
+      }
+
+      return window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) || "";
+    } catch (error) {
+      console.warn("DonationAlerts access token could not be read from localStorage.", error);
+      return "";
+    }
+  }
+
+  function saveDonationAlertsAccessToken(accessToken) {
+    try {
+      if (!window.localStorage) {
+        return;
+      }
+
+      window.localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken || "");
+    } catch (error) {
+      console.warn("DonationAlerts access token could not be saved to localStorage.", error);
+    }
+  }
+
+  function removeSavedDonationAlertsAccessToken() {
+    try {
+      if (!window.localStorage) {
+        return;
+      }
+
+      window.localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+    } catch (error) {
+      console.warn("DonationAlerts access token could not be removed from localStorage.", error);
     }
   }
 

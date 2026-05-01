@@ -174,7 +174,11 @@ vm.runInNewContext(
     ["/api/donationalerts/token"],
     "client sends OAuth token to backend memory"
   );
-  assert.deepStrictEqual(storedValues, {}, "client does not persist DonationAlerts token in localStorage");
+  assert.strictEqual(
+    storedValues.donationAlertsAccessToken,
+    "memory-token",
+    "client persists DonationAlerts token in localStorage after OAuth login"
+  );
   assert.strictEqual(fetchCalls[0].options.headers.Authorization, undefined, "token request does not echo token in Authorization header");
   assert.deepStrictEqual(JSON.parse(fetchCalls[0].options.body), {
     accessToken: "memory-token"
@@ -199,6 +203,15 @@ vm.runInNewContext(
     null,
     "client clears DonationAlerts status modal state after auto-close"
   );
+
+  context.window.location.hash = "";
+  context.window.RouletteApp.donationAlerts.init();
+  await flushPromises();
+
+  assert.strictEqual(fetchCalls[1].url, "/api/donationalerts/token", "client restores saved token to backend memory");
+  assert.deepStrictEqual(JSON.parse(fetchCalls[1].options.body), {
+    accessToken: "memory-token"
+  });
 
   eventSources[0].listeners.message({
     data: JSON.stringify({
@@ -324,6 +337,7 @@ vm.runInNewContext(
 
   assert.ok(authPanel, "client shows DonationAlerts token panel when auth fails");
   assert.ok(errorStatusModal, "client shows error modal after DonationAlerts login fails");
+  assert.strictEqual(storedValues.donationAlertsAccessToken, undefined, "client removes invalid saved access token");
   var errorStatusModalPanel = createdElements.find(function (element) {
     return element.className === "donation-auth-status-modal donation-auth-status-modal-error";
   });
