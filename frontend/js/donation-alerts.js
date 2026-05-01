@@ -4,6 +4,7 @@
   var app = window.RouletteApp;
   var state = app.state;
   var PROXY_BASE_URL = "/api/donationalerts";
+  var APPLICATION_ID_STORAGE_KEY = "donationAlertsApplicationId";
   var authCheckInFlight = false;
 
   function initDonationAlerts() {
@@ -193,7 +194,7 @@
     clientInput = doc.createElement("input");
     clientInput.id = "donation-alerts-client-id";
     clientInput.type = "text";
-    clientInput.value = "";
+    clientInput.value = readSavedDonationAlertsApplicationId();
     clientHeader.appendChild(clientLabel);
     clientHeader.appendChild(clientHelp);
     clientRow.appendChild(clientHeader);
@@ -219,6 +220,7 @@
     panel.appendChild(link);
 
     clientInput.addEventListener("input", function () {
+      saveDonationAlertsApplicationId(clientInput.value);
       link.href = getDonationAlertsAuthorizeUrl(redirectUrl, clientInput.value);
     });
 
@@ -291,6 +293,31 @@
     });
 
     return "https://www.donationalerts.com/oauth/authorize?" + params.toString().replace(/\+/g, "%20");
+  }
+
+  function readSavedDonationAlertsApplicationId() {
+    try {
+      if (!window.localStorage) {
+        return "";
+      }
+
+      return window.localStorage.getItem(APPLICATION_ID_STORAGE_KEY) || "";
+    } catch (error) {
+      console.warn("DonationAlerts application id could not be read from localStorage.", error);
+      return "";
+    }
+  }
+
+  function saveDonationAlertsApplicationId(applicationId) {
+    try {
+      if (!window.localStorage) {
+        return;
+      }
+
+      window.localStorage.setItem(APPLICATION_ID_STORAGE_KEY, applicationId || "");
+    } catch (error) {
+      console.warn("DonationAlerts application id could not be saved to localStorage.", error);
+    }
   }
 
   app.donationAlerts = {

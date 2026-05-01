@@ -295,6 +295,7 @@ vm.runInNewContext(
     });
   };
   context.window.RouletteApp.state.donationAlerts.socket = null;
+  storedValues.donationAlertsApplicationId = "18762";
   context.window.RouletteApp.donationAlerts.init();
   await flushPromises();
 
@@ -329,7 +330,7 @@ vm.runInNewContext(
   assert.strictEqual(timeoutCalls[1].delay, 3000, "client schedules DonationAlerts error modal auto-close after 3 seconds");
   timeoutCalls[1].callback();
   assert.strictEqual(errorStatusModalPanel.removed, true, "client closes DonationAlerts error modal after 3 seconds");
-  assert.strictEqual(panelInputs[0].value, "", "token panel leaves application id empty");
+  assert.strictEqual(panelInputs[0].value, "18762", "token panel restores saved application id");
   assert.strictEqual(panelInputs[0].readOnly, false, "token panel lets the user edit application id");
   assert.strictEqual(panelInputs[1].value, "http://127.0.0.1:3000/", "token panel shows redirect url");
   assert.strictEqual(panelInputs[1].readOnly, true, "token panel keeps redirect url read-only");
@@ -354,12 +355,19 @@ vm.runInNewContext(
     "application id help tooltip keeps hover active between trigger and tooltip"
   );
 
-  panelInputs[0].value = "18762";
-  panelInputs[0].oninput();
-
   assert.strictEqual(
     authLink.href,
     "https://www.donationalerts.com/oauth/authorize?client_id=18762&redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2F&response_type=token&scope=oauth-user-show%20oauth-donation-subscribe",
+    "token panel links to DonationAlerts OAuth with saved application id"
+  );
+
+  panelInputs[0].value = "24500";
+  panelInputs[0].oninput();
+
+  assert.strictEqual(storedValues.donationAlertsApplicationId, "24500", "token panel saves changed application id");
+  assert.strictEqual(
+    authLink.href,
+    "https://www.donationalerts.com/oauth/authorize?client_id=24500&redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2F&response_type=token&scope=oauth-user-show%20oauth-donation-subscribe",
     "token panel links to DonationAlerts OAuth"
   );
 }()).catch(function (error) {
