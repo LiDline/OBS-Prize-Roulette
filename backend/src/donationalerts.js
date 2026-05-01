@@ -116,6 +116,14 @@ async function handleDonationAlertsSubscribe(request, response, env, memory) {
 }
 
 async function connectDonationAlerts(env, memory, donationAlertsSocketFactory) {
+  if (memory.donationAlertsReconnectTimer) {
+    clearTimeout(memory.donationAlertsReconnectTimer);
+    memory.donationAlertsReconnectTimer = null;
+  }
+
+  memory.donationAlertsConnectionId = (memory.donationAlertsConnectionId || 0) + 1;
+  const connectionId = memory.donationAlertsConnectionId;
+  const previousSocket = memory.donationAlertsSocket;
   const profile = await donationAlertsApiRequest(env, "/user/oauth", {
     method: "GET",
     accessToken: memory.donationAlertsAccessToken
@@ -128,14 +136,22 @@ async function connectDonationAlerts(env, memory, donationAlertsSocketFactory) {
     throw new Error("DonationAlerts /user/oauth response does not contain id or socket_connection_token.");
   }
 
-  if (memory.donationAlertsSocket && typeof memory.donationAlertsSocket.close === "function") {
-    memory.donationAlertsSocket.close();
+  if (previousSocket && typeof previousSocket.close === "function") {
+    previousSocket.close();
   }
 
   memory.donationAlertsMessageId = 1;
   memory.donationAlertsSocket = donationAlertsSocketFactory(socketUrl);
 
   memory.donationAlertsSocket.addEventListener("open", function () {
+    if (connectionId !== memory.donationAlertsConnectionId) {
+      return;
+    }
+
+    broadcastDonationAlertsStatus(memory, {
+      status: "connected",
+      message: "DonationAlerts backend connected"
+    });
     sendDonationAlertsSocketMessage(memory, {
       params: {
         token: profileData.socket_connection_token
@@ -145,12 +161,56 @@ async function connectDonationAlerts(env, memory, donationAlertsSocketFactory) {
   });
 
   memory.donationAlertsSocket.addEventListener("message", function (event) {
+    if (connectionId !== memory.donationAlertsConnectionId) {
+      return;
+    }
+
     handleDonationAlertsSocketMessage(env, memory, channel, event.data || event);
   });
 
   memory.donationAlertsSocket.addEventListener("error", function (error) {
     console.error("DonationAlerts WebSocket error.", error);
+    scheduleDonationAlertsReconnect(env, memory, donationAlertsSocketFactory, connectionId);
   });
+
+  memory.donationAlertsSocket.addEventListener("close", function () {
+    scheduleDonationAlertsReconnect(env, memory, donationAlertsSocketFactory, connectionId);
+  });
+}
+
+function scheduleDonationAlertsReconnect(env, memory, donationAlertsSocketFactory, connectionId) {
+  const reconnectDelayMs = Math.max(1, Number(env.DONATIONALERTS_RECONNECT_DELAY_MS) || 1000);
+
+  if (connectionId !== memory.donationAlertsConnectionId || memory.donationAlertsReconnectTimer) {
+    return;
+  }
+
+  broadcastDonationAlertsStatus(memory, {
+    status: "disconnected",
+    message: "DonationAlerts backend connection lost"
+  });
+
+  memory.donationAlertsReconnectTimer = setTimeout(function () {
+    memory.donationAlertsReconnectTimer = null;
+
+    if (connectionId !== memory.donationAlertsConnectionId || !memory.donationAlertsAccessToken) {
+      return;
+    }
+
+    broadcastDonationAlertsStatus(memory, {
+      status: "reconnecting",
+      message: "DonationAlerts backend reconnecting"
+    });
+
+    connectDonationAlerts(env, memory, donationAlertsSocketFactory).catch(function (error) {
+      console.error("DonationAlerts WebSocket reconnect failed.", error);
+      scheduleDonationAlertsReconnect(env, memory, donationAlertsSocketFactory, memory.donationAlertsConnectionId);
+    });
+  }, reconnectDelayMs);
+
+  if (typeof memory.donationAlertsReconnectTimer.unref === "function") {
+    memory.donationAlertsReconnectTimer.unref();
+  }
 }
 
 async function handleDonationAlertsSocketMessage(env, memory, channel, rawData) {
@@ -321,6 +381,14 @@ function normalizeDonationAlertsDonation(value) {
 
 function broadcastDonationAlertsEvent(memory, donation) {
   const payload = "data: " + JSON.stringify(donation) + "\n\n";
+
+  memory.donationAlertsEventClients.forEach(function (client) {
+    client.write(payload);
+  });
+}
+
+function broadcastDonationAlertsStatus(memory, status) {
+  const payload = "event: status\n" + "data: " + JSON.stringify(status) + "\n\n";
 
   memory.donationAlertsEventClients.forEach(function (client) {
     client.write(payload);

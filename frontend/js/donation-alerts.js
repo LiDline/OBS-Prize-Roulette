@@ -82,10 +82,33 @@
       }
     });
 
+    state.donationAlerts.events.addEventListener("status", function (event) {
+      handleDonationAlertsConnectionStatus(event.data);
+    });
+
     state.donationAlerts.events.addEventListener("error", function () {
       console.warn("DonationAlerts local event stream interrupted; waiting for browser reconnect.");
       checkDonationAlertsAuthAfterStreamError();
     });
+  }
+
+  function handleDonationAlertsConnectionStatus(rawData) {
+    var status = parseDonationAlertsStatusEvent(rawData);
+
+    if (!status) {
+      return;
+    }
+
+    if (status.status === "disconnected" || status.status === "reconnecting") {
+      state.donationAlerts.connectionWasInterrupted = true;
+      showDonationAlertsStatusModal("error", "Соединение с DonationAlerts потеряно. Переподключаюсь...");
+      return;
+    }
+
+    if (status.status === "connected" && state.donationAlerts.connectionWasInterrupted) {
+      state.donationAlerts.connectionWasInterrupted = false;
+      showDonationAlertsStatusModal("success", "DonationAlerts снова подключен");
+    }
   }
 
   function checkDonationAlertsAuthAfterStreamError() {
@@ -145,6 +168,15 @@
       return JSON.parse(rawData);
     } catch (error) {
       console.warn("DonationAlerts local event is not valid JSON.", rawData, error);
+      return null;
+    }
+  }
+
+  function parseDonationAlertsStatusEvent(rawData) {
+    try {
+      return JSON.parse(rawData);
+    } catch (error) {
+      console.warn("DonationAlerts status event is not valid JSON.", rawData, error);
       return null;
     }
   }

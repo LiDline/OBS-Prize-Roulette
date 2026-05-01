@@ -263,6 +263,34 @@ vm.runInNewContext(
   );
   assert.strictEqual(eventSources[0].closed, undefined, "client does not close EventSource after transient stream errors");
 
+  eventSources[0].listeners.status({
+    data: JSON.stringify({
+      status: "disconnected",
+      message: "DonationAlerts backend connection lost"
+    })
+  });
+  assert.ok(
+    createdElements.some(function (element) {
+      return element.className === "donation-auth-status-message" &&
+        element.textContent === "Соединение с DonationAlerts потеряно. Переподключаюсь...";
+    }),
+    "client shows alert when backend DonationAlerts connection is lost"
+  );
+
+  eventSources[0].listeners.status({
+    data: JSON.stringify({
+      status: "connected",
+      message: "DonationAlerts backend connected"
+    })
+  });
+  assert.ok(
+    createdElements.some(function (element) {
+      return element.className === "donation-auth-status-message" &&
+        element.textContent === "DonationAlerts снова подключен";
+    }),
+    "client shows alert when backend DonationAlerts connection is restored"
+  );
+
   context.window.fetch = function (url, options) {
     fetchCalls.push({
       url,
@@ -341,8 +369,8 @@ vm.runInNewContext(
   var errorStatusModalPanel = createdElements.find(function (element) {
     return element.className === "donation-auth-status-modal donation-auth-status-modal-error";
   });
-  assert.strictEqual(timeoutCalls[1].delay, 3000, "client schedules DonationAlerts error modal auto-close after 3 seconds");
-  timeoutCalls[1].callback();
+  assert.strictEqual(timeoutCalls[3].delay, 3000, "client schedules DonationAlerts error modal auto-close after 3 seconds");
+  timeoutCalls[3].callback();
   assert.strictEqual(errorStatusModalPanel.removed, true, "client closes DonationAlerts error modal after 3 seconds");
   assert.strictEqual(panelInputs[0].value, "18762", "token panel restores saved application id");
   assert.strictEqual(panelInputs[0].readOnly, false, "token panel lets the user edit application id");

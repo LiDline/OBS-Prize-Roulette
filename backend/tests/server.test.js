@@ -103,10 +103,12 @@ function requestText(baseUrl, pathname) {
 function openEventStream(baseUrl, pathname) {
   const requestUrl = new URL(baseUrl + pathname);
   const events = [];
+  const statuses = [];
   const comments = [];
 
   const stream = {
     events,
+    statuses,
     comments,
     close: function () {
       if (stream.request) {
@@ -137,12 +139,19 @@ function openEventStream(baseUrl, pathname) {
           const dataLine = eventBlock.split(/\n/).find(function (line) {
             return line.indexOf("data: ") === 0;
           });
+          const eventLine = eventBlock.split(/\n/).find(function (line) {
+            return line.indexOf("event: ") === 0;
+          });
           const commentLine = eventBlock.split(/\n/).find(function (line) {
             return line.indexOf(": ") === 0;
           });
 
           if (dataLine) {
-            events.push(JSON.parse(dataLine.slice("data: ".length)));
+            if (eventLine && eventLine.slice("event: ".length) === "status") {
+              statuses.push(JSON.parse(dataLine.slice("data: ".length)));
+            } else {
+              events.push(JSON.parse(dataLine.slice("data: ".length)));
+            }
           } else if (commentLine) {
             comments.push(commentLine.slice(": ".length));
           }
@@ -372,7 +381,8 @@ function createHangingDonationAlertsStub() {
     env: {
       DONATIONALERTS_API_BASE_URL: donationAlertsUrl,
       DONATIONALERTS_SOCKET_URL: "ws://127.0.0.1/donation-alerts",
-      DONATIONALERTS_EVENTS_HEARTBEAT_MS: "10"
+      DONATIONALERTS_EVENTS_HEARTBEAT_MS: "10",
+      DONATIONALERTS_RECONNECT_DELAY_MS: "10"
     }
   });
   const overlayInstance = await listen(overlayServer);
@@ -403,6 +413,13 @@ function createHangingDonationAlertsStub() {
     );
 
     fakeSocket.sockets[0].emit("open");
+    await waitForCondition(function () {
+      return eventStream.statuses.length === 1;
+    });
+    assert.deepStrictEqual(eventStream.statuses[0], {
+      status: "connected",
+      message: "DonationAlerts backend connected"
+    });
     assert.deepStrictEqual(fakeSocket.sockets[0].sent[0], {
       params: {
         token: "socket-token"
@@ -450,6 +467,38 @@ function createHangingDonationAlertsStub() {
       id: null
     });
 
+    fakeSocket.sockets[0].emit("close");
+    await waitForCondition(function () {
+      return fakeSocket.sockets.length === 2;
+    });
+    await waitForCondition(function () {
+      return eventStream.statuses.length >= 3;
+    });
+    assert.deepStrictEqual(eventStream.statuses.slice(1, 3), [
+      {
+        status: "disconnected",
+        message: "DonationAlerts backend connection lost"
+      },
+      {
+        status: "reconnecting",
+        message: "DonationAlerts backend reconnecting"
+      }
+    ]);
+    fakeSocket.sockets[1].emit("open");
+    await waitForCondition(function () {
+      return eventStream.statuses.length === 4;
+    });
+    assert.deepStrictEqual(eventStream.statuses[3], {
+      status: "connected",
+      message: "DonationAlerts backend connected"
+    });
+    assert.deepStrictEqual(fakeSocket.sockets[1].sent[0], {
+      params: {
+        token: "socket-token"
+      },
+      id: 2
+    });
+
     assert.deepStrictEqual(
       donationAlerts.requests.map(function (request) {
         return {
@@ -474,6 +523,12 @@ function createHangingDonationAlertsStub() {
             channels: ["$alerts:donation_321"],
             client: "client-id"
           })
+        },
+        {
+          method: "GET",
+          url: "/user/oauth",
+          authorization: "Bearer access-token",
+          body: ""
         }
       ],
       "backend owns DonationAlerts API calls after token is stored"
