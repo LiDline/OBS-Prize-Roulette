@@ -23,6 +23,10 @@ function createServer(options) {
   const donationAlertsSocketFactory = options.donationAlertsSocketFactory || createWebSocketClient;
   const memory = {
     donationAlertsAccessToken: "",
+    donationAlertsRefreshToken: "",
+    donationAlertsClientId: "",
+    donationAlertsClientSecret: "",
+    donationAlertsTokenExpiresIn: null,
     donationAlertsSocket: null,
     donationAlertsMessageId: 1,
     donationAlertsEventClients: []

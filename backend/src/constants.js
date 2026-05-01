@@ -1,6 +1,7 @@
 const DEFAULT_PORT = 3000;
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_API_BASE_URL = "https://www.donationalerts.com/api/v1";
+const DEFAULT_OAUTH_TOKEN_URL = "https://www.donationalerts.com/oauth/token";
 const DEFAULT_SOCKET_URL = "wss://centrifugo.donationalerts.com/connection/websocket";
 const DEFAULT_EVENTS_HEARTBEAT_MS = 15000;
 
@@ -18,6 +19,7 @@ module.exports = {
   DEFAULT_API_BASE_URL,
   DEFAULT_EVENTS_HEARTBEAT_MS,
   DEFAULT_HOST,
+  DEFAULT_OAUTH_TOKEN_URL,
   DEFAULT_PORT,
   DEFAULT_SOCKET_URL,
   MIME_TYPES

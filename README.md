@@ -86,14 +86,21 @@ uploads: Wyvern.png
 
 ### DonationAlerts
 
-Интеграция DonationAlerts находится на backend-стороне. Браузер проходит OAuth и
-передает access token в `/api/donationalerts/token`, далее слушает локальные события
-из `/api/donationalerts/events`.
+Интеграция DonationAlerts находится на backend-стороне. Браузер проходит OAuth
+Authorization Code flow, передает code в `/api/donationalerts/token`, backend
+обменивает его на access token и refresh token, далее браузер слушает локальные
+события из `/api/donationalerts/events`.
+
+В панели DonationAlerts укажите ID приложения и ключ API из карточки приложения.
+Оверлей сохраняет ID приложения, ключ API, access token и refresh token в
+`localStorage`. Если DonationAlerts отклонит access token, backend обновит его
+через refresh token и отправит новые токены обратно в браузер для сохранения.
 
 Опциональные backend-настройки можно задать в `.env`:
 
 ```env
 DONATIONALERTS_API_BASE_URL=https://www.donationalerts.com/api/v1
+DONATIONALERTS_OAUTH_TOKEN_URL=https://www.donationalerts.com/oauth/token
 DONATIONALERTS_SOCKET_URL=wss://centrifugo.donationalerts.com/connection/websocket
 DONATIONALERTS_REQUEST_TIMEOUT_MS=10000
 ```

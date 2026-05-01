@@ -5,6 +5,7 @@ const { URL } = require("url");
 const {
   DEFAULT_API_BASE_URL,
   DEFAULT_EVENTS_HEARTBEAT_MS,
+  DEFAULT_OAUTH_TOKEN_URL,
   DEFAULT_SOCKET_URL
 } = require("./constants");
 const { writeJson } = require("./http-response");
@@ -13,6 +14,40 @@ async function handleDonationAlertsToken(request, response, env, memory, donatio
   try {
     const body = await readRequestJson(request);
     const accessToken = typeof body.accessToken === "string" ? body.accessToken.trim() : "";
+    const authorizationCode = typeof body.authorizationCode === "string" ? body.authorizationCode.trim() : "";
+    const refreshToken = typeof body.refreshToken === "string" ? body.refreshToken.trim() : "";
+    const clientId = typeof body.clientId === "string" ? body.clientId.trim() : "";
+    const clientSecret = typeof body.clientSecret === "string" ? body.clientSecret.trim() : "";
+
+    if (authorizationCode) {
+      const redirectUri = typeof body.redirectUri === "string" ? body.redirectUri.trim() : "";
+
+      if (!clientId || !clientSecret || !redirectUri) {
+        writeJson(response, 400, {
+          error: "DonationAlerts client id, client secret, and redirect uri are required."
+        });
+        return;
+      }
+
+      const tokenData = await donationAlertsOAuthTokenRequest(env, {
+        grant_type: "authorization_code",
+        code: authorizationCode,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri
+      });
+
+      storeDonationAlertsTokens(memory, {
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        clientId,
+        clientSecret,
+        expiresIn: tokenData.expires_in
+      });
+      await connectDonationAlerts(env, memory, donationAlertsSocketFactory);
+      writeJson(response, 200, getDonationAlertsTokenResponse(memory));
+      return;
+    }
 
     if (!accessToken) {
       writeJson(response, 400, {
@@ -21,9 +56,15 @@ async function handleDonationAlertsToken(request, response, env, memory, donatio
       return;
     }
 
-    memory.donationAlertsAccessToken = accessToken;
+    storeDonationAlertsTokens(memory, {
+      accessToken,
+      refreshToken,
+      clientId,
+      clientSecret,
+      expiresIn: body.expiresIn
+    });
     await connectDonationAlerts(env, memory, donationAlertsSocketFactory);
-    writeJson(response, 200, { ok: true });
+    writeJson(response, 200, getDonationAlertsTokenResponse(memory));
   } catch (error) {
     writeJson(response, error.statusCode || 400, {
       error: error.message || "Request body must contain valid JSON."
@@ -66,9 +107,8 @@ function handleDonationAlertsEvents(request, response, env, memory) {
 
 async function handleDonationAlertsAuth(request, response, env, memory) {
   try {
-    const profile = await donationAlertsApiRequest(env, "/user/oauth", {
-      method: "GET",
-      accessToken: memory.donationAlertsAccessToken
+    const profile = await donationAlertsApiRequestWithRefresh(env, memory, "/user/oauth", {
+      method: "GET"
     });
     const profileData = profile && profile.data ? profile.data : {};
 
@@ -78,7 +118,10 @@ async function handleDonationAlertsAuth(request, response, env, memory) {
 
     writeJson(response, 200, {
       userId: profileData.id,
-      socketConnectionToken: profileData.socket_connection_token
+      socketConnectionToken: profileData.socket_connection_token,
+      accessToken: memory.donationAlertsAccessToken,
+      refreshToken: memory.donationAlertsRefreshToken,
+      expiresIn: memory.donationAlertsTokenExpiresIn
     });
   } catch (error) {
     writeJson(response, error.statusCode || 500, {
@@ -98,9 +141,8 @@ async function handleDonationAlertsSubscribe(request, response, env, memory) {
       return;
     }
 
-    const subscription = await donationAlertsApiRequest(env, "/centrifuge/subscribe", {
+    const subscription = await donationAlertsApiRequestWithRefresh(env, memory, "/centrifuge/subscribe", {
       method: "POST",
-      accessToken: memory.donationAlertsAccessToken,
       body: JSON.stringify({
         channels: body.channels,
         client: body.client
@@ -124,9 +166,8 @@ async function connectDonationAlerts(env, memory, donationAlertsSocketFactory) {
   memory.donationAlertsConnectionId = (memory.donationAlertsConnectionId || 0) + 1;
   const connectionId = memory.donationAlertsConnectionId;
   const previousSocket = memory.donationAlertsSocket;
-  const profile = await donationAlertsApiRequest(env, "/user/oauth", {
-    method: "GET",
-    accessToken: memory.donationAlertsAccessToken
+  const profile = await donationAlertsApiRequestWithRefresh(env, memory, "/user/oauth", {
+    method: "GET"
   });
   const profileData = profile && profile.data ? profile.data : {};
   const channel = "$alerts:donation_" + profileData.id;
@@ -223,9 +264,8 @@ async function handleDonationAlertsSocketMessage(env, memory, channel, rawData) 
   }
 
   if (clientId) {
-    const subscription = await donationAlertsApiRequest(env, "/centrifuge/subscribe", {
+    const subscription = await donationAlertsApiRequestWithRefresh(env, memory, "/centrifuge/subscribe", {
       method: "POST",
-      accessToken: memory.donationAlertsAccessToken,
       body: JSON.stringify({
         channels: [channel],
         client: clientId
@@ -256,6 +296,130 @@ async function handleDonationAlertsSocketMessage(env, memory, channel, rawData) 
   if (donation) {
     broadcastDonationAlertsEvent(memory, donation);
   }
+}
+
+async function donationAlertsApiRequestWithRefresh(env, memory, pathname, options) {
+  try {
+    return await donationAlertsApiRequest(env, pathname, {
+      method: options.method,
+      accessToken: memory.donationAlertsAccessToken,
+      body: options.body
+    });
+  } catch (error) {
+    if (error.statusCode !== 401 || !memory.donationAlertsRefreshToken) {
+      throw error;
+    }
+
+    await refreshDonationAlertsAccessToken(env, memory);
+    return donationAlertsApiRequest(env, pathname, {
+      method: options.method,
+      accessToken: memory.donationAlertsAccessToken,
+      body: options.body
+    });
+  }
+}
+
+async function refreshDonationAlertsAccessToken(env, memory) {
+  if (!memory.donationAlertsClientId || !memory.donationAlertsClientSecret) {
+    const error = new Error("DonationAlerts client id and client secret are required to refresh access token.");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const tokenData = await donationAlertsOAuthTokenRequest(env, {
+    grant_type: "refresh_token",
+    refresh_token: memory.donationAlertsRefreshToken,
+    client_id: memory.donationAlertsClientId,
+    client_secret: memory.donationAlertsClientSecret,
+    scope: "oauth-user-show oauth-donation-subscribe"
+  });
+
+  storeDonationAlertsTokens(memory, {
+    accessToken: tokenData.access_token,
+    refreshToken: tokenData.refresh_token || memory.donationAlertsRefreshToken,
+    clientId: memory.donationAlertsClientId,
+    clientSecret: memory.donationAlertsClientSecret,
+    expiresIn: tokenData.expires_in
+  });
+  broadcastDonationAlertsToken(memory);
+}
+
+function donationAlertsOAuthTokenRequest(env, params) {
+  const tokenUrl = new URL(env.DONATIONALERTS_OAUTH_TOKEN_URL || DEFAULT_OAUTH_TOKEN_URL);
+  const transport = tokenUrl.protocol === "http:" ? http : https;
+  const timeoutMs = Math.max(1, Number(env.DONATIONALERTS_REQUEST_TIMEOUT_MS) || 10000);
+  const body = new URLSearchParams(params).toString();
+
+  return new Promise(function (resolve, reject) {
+    const tokenRequest = transport.request({
+      method: "POST",
+      hostname: tokenUrl.hostname,
+      port: tokenUrl.port,
+      path: tokenUrl.pathname + tokenUrl.search,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": Buffer.byteLength(body)
+      }
+    }, function (tokenResponse) {
+      let responseBody = "";
+
+      tokenResponse.on("data", function (chunk) {
+        responseBody += chunk;
+      });
+
+      tokenResponse.on("end", function () {
+        if (tokenResponse.statusCode < 200 || tokenResponse.statusCode >= 300) {
+          const error = new Error("DonationAlerts OAuth token request failed with HTTP " + tokenResponse.statusCode);
+          error.statusCode = tokenResponse.statusCode;
+          reject(error);
+          return;
+        }
+
+        try {
+          resolve(responseBody ? JSON.parse(responseBody) : {});
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+
+    tokenRequest.on("error", reject);
+    tokenRequest.setTimeout(timeoutMs, function () {
+      const error = new Error("DonationAlerts OAuth token request timed out.");
+      error.statusCode = 504;
+      tokenRequest.destroy(error);
+    });
+    tokenRequest.write(body);
+    tokenRequest.end();
+  });
+}
+
+function storeDonationAlertsTokens(memory, tokens) {
+  memory.donationAlertsAccessToken = tokens.accessToken || "";
+  memory.donationAlertsRefreshToken = tokens.refreshToken || "";
+  memory.donationAlertsClientId = tokens.clientId || "";
+  memory.donationAlertsClientSecret = tokens.clientSecret || "";
+  memory.donationAlertsTokenExpiresIn = Number(tokens.expiresIn) || null;
+}
+
+function getDonationAlertsTokenResponse(memory) {
+  const response = {
+    ok: true
+  };
+
+  if (memory.donationAlertsAccessToken && memory.donationAlertsRefreshToken) {
+    response.accessToken = memory.donationAlertsAccessToken;
+  }
+
+  if (memory.donationAlertsRefreshToken) {
+    response.refreshToken = memory.donationAlertsRefreshToken;
+  }
+
+  if (memory.donationAlertsTokenExpiresIn) {
+    response.expiresIn = memory.donationAlertsTokenExpiresIn;
+  }
+
+  return response;
 }
 
 function donationAlertsApiRequest(env, pathname, options) {
@@ -389,6 +553,14 @@ function broadcastDonationAlertsEvent(memory, donation) {
 
 function broadcastDonationAlertsStatus(memory, status) {
   const payload = "event: status\n" + "data: " + JSON.stringify(status) + "\n\n";
+
+  memory.donationAlertsEventClients.forEach(function (client) {
+    client.write(payload);
+  });
+}
+
+function broadcastDonationAlertsToken(memory) {
+  const payload = "event: token\n" + "data: " + JSON.stringify(getDonationAlertsTokenResponse(memory)) + "\n\n";
 
   memory.donationAlertsEventClients.forEach(function (client) {
     client.write(payload);

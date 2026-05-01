@@ -252,6 +252,88 @@ function createDonationAlertsStub() {
         return;
       }
 
+      if (request.url === "/oauth/token" && request.method === "POST") {
+        const params = new URLSearchParams(body);
+
+        response.setHeader("Content-Type", "application/json");
+
+        if (params.get("grant_type") === "authorization_code") {
+          response.end(JSON.stringify({
+            access_token: "code-access-token",
+            refresh_token: "code-refresh-token",
+            expires_in: 3600,
+            token_type: "Bearer"
+          }));
+          return;
+        }
+
+        if (params.get("grant_type") === "refresh_token") {
+          response.end(JSON.stringify({
+            access_token: "refreshed-access-token",
+            refresh_token: "refreshed-refresh-token",
+            expires_in: 7200,
+            token_type: "Bearer"
+          }));
+          return;
+        }
+      }
+
+      response.statusCode = 404;
+      response.end(JSON.stringify({ error: "not found" }));
+    });
+  });
+
+  return {
+    app,
+    requests
+  };
+}
+
+function createExpiringDonationAlertsStub() {
+  const requests = [];
+  const app = http.createServer(function (request, response) {
+    let body = "";
+
+    request.on("data", function (chunk) {
+      body += chunk;
+    });
+
+    request.on("end", function () {
+      requests.push({
+        method: request.method,
+        url: request.url,
+        authorization: request.headers.authorization,
+        body: body
+      });
+
+      if (request.url === "/user/oauth" && request.method === "GET") {
+        if (request.headers.authorization === "Bearer expired-access-token") {
+          response.statusCode = 401;
+          response.end(JSON.stringify({ error: "expired token" }));
+          return;
+        }
+
+        response.setHeader("Content-Type", "application/json");
+        response.end(JSON.stringify({
+          data: {
+            id: 321,
+            socket_connection_token: "socket-token"
+          }
+        }));
+        return;
+      }
+
+      if (request.url === "/oauth/token" && request.method === "POST") {
+        response.setHeader("Content-Type", "application/json");
+        response.end(JSON.stringify({
+          access_token: "refreshed-access-token",
+          refresh_token: "refreshed-refresh-token",
+          expires_in: 7200,
+          token_type: "Bearer"
+        }));
+        return;
+      }
+
       response.statusCode = 404;
       response.end(JSON.stringify({ error: "not found" }));
     });
@@ -601,6 +683,142 @@ function createHangingDonationAlertsStub() {
   } finally {
     await close(browserTokenOverlayInstance);
     await close(browserTokenDonationAlertsServer);
+  }
+
+  const codeDonationAlerts = createDonationAlertsStub();
+  const codeDonationAlertsServer = await listen(codeDonationAlerts.app);
+  const codeDonationAlertsUrl = "http://127.0.0.1:" + codeDonationAlertsServer.address().port;
+  const codeTokenSocket = createFakeDonationAlertsSocketFactory();
+  const codeTokenOverlayServer = server.createServer({
+    rootDir: process.cwd(),
+    donationAlertsSocketFactory: codeTokenSocket.factory,
+    env: {
+      DONATIONALERTS_API_BASE_URL: codeDonationAlertsUrl,
+      DONATIONALERTS_OAUTH_TOKEN_URL: codeDonationAlertsUrl + "/oauth/token",
+      DONATIONALERTS_SOCKET_URL: "ws://127.0.0.1/donation-alerts"
+    }
+  });
+  const codeTokenOverlayInstance = await listen(codeTokenOverlayServer);
+  const codeTokenOverlayUrl = "http://127.0.0.1:" + codeTokenOverlayInstance.address().port;
+
+  try {
+    const token = await requestJson(codeTokenOverlayUrl, "/api/donationalerts/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        authorizationCode: "oauth-code",
+        clientId: "client-id",
+        clientSecret: "client-secret",
+        redirectUri: "http://127.0.0.1:3000/"
+      })
+    });
+    assert.strictEqual(token.status, 200, "token endpoint exchanges authorization code");
+    assert.deepStrictEqual(token.body, {
+      ok: true,
+      accessToken: "code-access-token",
+      refreshToken: "code-refresh-token",
+      expiresIn: 3600
+    });
+    assert.strictEqual(codeTokenSocket.sockets.length, 1, "backend connects after code exchange");
+    assert.deepStrictEqual(
+      codeDonationAlerts.requests.map(function (request) {
+        return {
+          method: request.method,
+          url: request.url,
+          authorization: request.authorization,
+          body: request.body
+        };
+      }),
+      [
+        {
+          method: "POST",
+          url: "/oauth/token",
+          authorization: undefined,
+          body: "grant_type=authorization_code&code=oauth-code&client_id=client-id&client_secret=client-secret&redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2F"
+        },
+        {
+          method: "GET",
+          url: "/user/oauth",
+          authorization: "Bearer code-access-token",
+          body: ""
+        }
+      ],
+      "backend exchanges code before calling DonationAlerts API"
+    );
+  } finally {
+    await close(codeTokenOverlayInstance);
+    await close(codeDonationAlertsServer);
+  }
+
+  const refreshDonationAlerts = createExpiringDonationAlertsStub();
+  const refreshDonationAlertsServer = await listen(refreshDonationAlerts.app);
+  const refreshDonationAlertsUrl = "http://127.0.0.1:" + refreshDonationAlertsServer.address().port;
+  const refreshSocket = createFakeDonationAlertsSocketFactory();
+  const refreshOverlayServer = server.createServer({
+    rootDir: process.cwd(),
+    donationAlertsSocketFactory: refreshSocket.factory,
+    env: {
+      DONATIONALERTS_API_BASE_URL: refreshDonationAlertsUrl,
+      DONATIONALERTS_OAUTH_TOKEN_URL: refreshDonationAlertsUrl + "/oauth/token",
+      DONATIONALERTS_SOCKET_URL: "ws://127.0.0.1/donation-alerts"
+    }
+  });
+  const refreshOverlayInstance = await listen(refreshOverlayServer);
+  const refreshOverlayUrl = "http://127.0.0.1:" + refreshOverlayInstance.address().port;
+
+  try {
+    const token = await requestJson(refreshOverlayUrl, "/api/donationalerts/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        accessToken: "expired-access-token",
+        refreshToken: "saved-refresh-token",
+        clientId: "client-id",
+        clientSecret: "client-secret"
+      })
+    });
+    assert.strictEqual(token.status, 200, "token endpoint refreshes expired access token");
+    assert.deepStrictEqual(token.body, {
+      ok: true,
+      accessToken: "refreshed-access-token",
+      refreshToken: "refreshed-refresh-token",
+      expiresIn: 7200
+    });
+    assert.strictEqual(refreshSocket.sockets.length, 1, "backend connects after refreshing token");
+    assert.deepStrictEqual(
+      refreshDonationAlerts.requests.map(function (request) {
+        return {
+          method: request.method,
+          url: request.url,
+          authorization: request.authorization,
+          body: request.body
+        };
+      }),
+      [
+        {
+          method: "GET",
+          url: "/user/oauth",
+          authorization: "Bearer expired-access-token",
+          body: ""
+        },
+        {
+          method: "POST",
+          url: "/oauth/token",
+          authorization: undefined,
+          body: "grant_type=refresh_token&refresh_token=saved-refresh-token&client_id=client-id&client_secret=client-secret&scope=oauth-user-show+oauth-donation-subscribe"
+        },
+        {
+          method: "GET",
+          url: "/user/oauth",
+          authorization: "Bearer refreshed-access-token",
+          body: ""
+        }
+      ],
+      "backend refreshes access token after DonationAlerts rejects it"
+    );
+  } finally {
+    await close(refreshOverlayInstance);
+    await close(refreshDonationAlertsServer);
   }
 
   const restartedDonationAlerts = createDonationAlertsStub();

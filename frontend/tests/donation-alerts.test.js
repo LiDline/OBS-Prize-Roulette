@@ -9,7 +9,10 @@ const socketListeners = {};
 const styleCss = fs.readFileSync(path.join(__dirname, "..", "style.css"), "utf8");
 const fetchCalls = [];
 const createdElements = [];
-const storedValues = {};
+const storedValues = {
+  donationAlertsApplicationId: "18762",
+  donationAlertsClientSecret: "client-secret"
+};
 const eventSources = [];
 const startedDonations = [];
 const timeoutCalls = [];
@@ -83,8 +86,8 @@ const context = {
     location: {
       origin: "http://127.0.0.1:3000",
       pathname: "/",
-      search: "",
-      hash: "#access_token=memory-token"
+      search: "?code=oauth-code",
+      hash: ""
     },
     history: {
       replaceState: function () {}
@@ -125,7 +128,12 @@ const context = {
         return Promise.resolve({
           ok: true,
           json: function () {
-            return Promise.resolve({ ok: true });
+            return Promise.resolve({
+              ok: true,
+              accessToken: "memory-token",
+              refreshToken: "memory-refresh-token",
+              expiresIn: 3600
+            });
           }
         });
       }
@@ -172,16 +180,28 @@ vm.runInNewContext(
       return call.url;
     }),
     ["/api/donationalerts/token"],
-    "client sends OAuth token to backend memory"
+    "client sends OAuth code to backend"
   );
   assert.strictEqual(
     storedValues.donationAlertsAccessToken,
     "memory-token",
     "client persists DonationAlerts token in localStorage after OAuth login"
   );
+  assert.strictEqual(
+    storedValues.donationAlertsRefreshToken,
+    "memory-refresh-token",
+    "client persists DonationAlerts refresh token in localStorage after OAuth login"
+  );
+  assert.ok(
+    Number(storedValues.donationAlertsAccessTokenExpiresAt) > Date.now(),
+    "client persists DonationAlerts access token expiry in localStorage after OAuth login"
+  );
   assert.strictEqual(fetchCalls[0].options.headers.Authorization, undefined, "token request does not echo token in Authorization header");
   assert.deepStrictEqual(JSON.parse(fetchCalls[0].options.body), {
-    accessToken: "memory-token"
+    authorizationCode: "oauth-code",
+    clientId: "18762",
+    clientSecret: "client-secret",
+    redirectUri: "http://127.0.0.1:3000/"
   });
   assert.strictEqual(eventSources.length, 1, "client opens local DonationAlerts event stream");
   assert.strictEqual(eventSources[0].url, "/api/donationalerts/events");
@@ -204,13 +224,16 @@ vm.runInNewContext(
     "client clears DonationAlerts status modal state after auto-close"
   );
 
-  context.window.location.hash = "";
+  context.window.location.search = "";
   context.window.RouletteApp.donationAlerts.init();
   await flushPromises();
 
   assert.strictEqual(fetchCalls[1].url, "/api/donationalerts/token", "client restores saved token to backend memory");
   assert.deepStrictEqual(JSON.parse(fetchCalls[1].options.body), {
-    accessToken: "memory-token"
+    accessToken: "memory-token",
+    refreshToken: "memory-refresh-token",
+    clientId: "18762",
+    clientSecret: "client-secret"
   });
 
   eventSources[0].listeners.message({
@@ -237,7 +260,10 @@ vm.runInNewContext(
         json: function () {
           return Promise.resolve({
             userId: 321,
-            socketConnectionToken: "socket-token"
+            socketConnectionToken: "socket-token",
+            accessToken: "auth-refreshed-token",
+            refreshToken: "auth-refreshed-refresh-token",
+            expiresIn: 7200
           });
         }
       });
@@ -262,6 +288,34 @@ vm.runInNewContext(
     "client keeps EventSource reconnecting when backend auth is still valid"
   );
   assert.strictEqual(eventSources[0].closed, undefined, "client does not close EventSource after transient stream errors");
+  assert.strictEqual(
+    storedValues.donationAlertsAccessToken,
+    "auth-refreshed-token",
+    "client updates saved access token when backend auth refreshes it"
+  );
+  assert.strictEqual(
+    storedValues.donationAlertsRefreshToken,
+    "auth-refreshed-refresh-token",
+    "client updates saved refresh token when backend auth refreshes it"
+  );
+
+  eventSources[0].listeners.token({
+    data: JSON.stringify({
+      accessToken: "event-refreshed-token",
+      refreshToken: "event-refreshed-refresh-token",
+      expiresIn: 1800
+    })
+  });
+  assert.strictEqual(
+    storedValues.donationAlertsAccessToken,
+    "event-refreshed-token",
+    "client updates saved access token from backend token event"
+  );
+  assert.strictEqual(
+    storedValues.donationAlertsRefreshToken,
+    "event-refreshed-refresh-token",
+    "client updates saved refresh token from backend token event"
+  );
 
   eventSources[0].listeners.status({
     data: JSON.stringify({
@@ -337,6 +391,7 @@ vm.runInNewContext(
   };
   context.window.RouletteApp.state.donationAlerts.socket = null;
   storedValues.donationAlertsApplicationId = "18762";
+  storedValues.donationAlertsClientSecret = "client-secret";
   context.window.RouletteApp.donationAlerts.init();
   await flushPromises();
 
@@ -366,6 +421,7 @@ vm.runInNewContext(
   assert.ok(authPanel, "client shows DonationAlerts token panel when auth fails");
   assert.ok(errorStatusModal, "client shows error modal after DonationAlerts login fails");
   assert.strictEqual(storedValues.donationAlertsAccessToken, undefined, "client removes invalid saved access token");
+  assert.strictEqual(storedValues.donationAlertsRefreshToken, undefined, "client removes invalid saved refresh token");
   var errorStatusModalPanel = createdElements.find(function (element) {
     return element.className === "donation-auth-status-modal donation-auth-status-modal-error";
   });
@@ -374,8 +430,10 @@ vm.runInNewContext(
   assert.strictEqual(errorStatusModalPanel.removed, true, "client closes DonationAlerts error modal after 3 seconds");
   assert.strictEqual(panelInputs[0].value, "18762", "token panel restores saved application id");
   assert.strictEqual(panelInputs[0].readOnly, false, "token panel lets the user edit application id");
-  assert.strictEqual(panelInputs[1].value, "http://127.0.0.1:3000/", "token panel shows redirect url");
-  assert.strictEqual(panelInputs[1].readOnly, true, "token panel keeps redirect url read-only");
+  assert.strictEqual(panelInputs[1].value, "client-secret", "token panel restores saved client secret");
+  assert.strictEqual(panelInputs[1].readOnly, false, "token panel lets the user edit client secret");
+  assert.strictEqual(panelInputs[2].value, "http://127.0.0.1:3000/", "token panel shows redirect url");
+  assert.strictEqual(panelInputs[2].readOnly, true, "token panel keeps redirect url read-only");
   assert.ok(helpTrigger, "token panel shows application id help trigger");
   assert.ok(helpTooltip, "token panel includes application id help tooltip");
   assert.strictEqual(
@@ -399,17 +457,20 @@ vm.runInNewContext(
 
   assert.strictEqual(
     authLink.href,
-    "https://www.donationalerts.com/oauth/authorize?client_id=18762&redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2F&response_type=token&scope=oauth-user-show%20oauth-donation-subscribe",
+    "https://www.donationalerts.com/oauth/authorize?client_id=18762&redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2F&response_type=code&scope=oauth-user-show%20oauth-donation-subscribe",
     "token panel links to DonationAlerts OAuth with saved application id"
   );
 
   panelInputs[0].value = "24500";
   panelInputs[0].oninput();
+  panelInputs[1].value = "new-client-secret";
+  panelInputs[1].oninput();
 
   assert.strictEqual(storedValues.donationAlertsApplicationId, "24500", "token panel saves changed application id");
+  assert.strictEqual(storedValues.donationAlertsClientSecret, "new-client-secret", "token panel saves changed client secret");
   assert.strictEqual(
     authLink.href,
-    "https://www.donationalerts.com/oauth/authorize?client_id=24500&redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2F&response_type=token&scope=oauth-user-show%20oauth-donation-subscribe",
+    "https://www.donationalerts.com/oauth/authorize?client_id=24500&redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2F&response_type=code&scope=oauth-user-show%20oauth-donation-subscribe",
     "token panel links to DonationAlerts OAuth"
   );
 }()).catch(function (error) {
