@@ -164,19 +164,58 @@
     }).catch(function (error) {
       if (error && error.status === 401) {
         console.error("DonationAlerts auth check failed after local event stream error.", error);
-
-        if (state.donationAlerts.events && typeof state.donationAlerts.events.close === "function") {
-          state.donationAlerts.events.close();
-        }
-
-        showDonationAlertsTokenPanel();
-        return;
+        return restoreDonationAlertsBackendMemoryAfterRestart();
       }
 
       console.warn("DonationAlerts auth check could not confirm token loss; keeping EventSource reconnect active.", error);
     }).finally(function () {
       authCheckInFlight = false;
     });
+  }
+
+  function restoreDonationAlertsBackendMemoryAfterRestart() {
+    var token = readSavedDonationAlertsAccessToken();
+
+    if (!token) {
+      showDonationAlertsTokenPanelAfterAuthLoss();
+      return Promise.resolve();
+    }
+
+    return donationAlertsProxyRequest("/token", {
+      method: "POST",
+      body: JSON.stringify({
+        accessToken: token,
+        refreshToken: readSavedDonationAlertsRefreshToken(),
+        clientId: readSavedDonationAlertsApplicationId(),
+        clientSecret: readSavedDonationAlertsClientSecret()
+      })
+    }).then(function (response) {
+      saveDonationAlertsTokenResponse(Object.assign({ accessToken: token }, response));
+
+      if (state.donationAlerts.events && typeof state.donationAlerts.events.close === "function") {
+        state.donationAlerts.events.close();
+      }
+
+      connectLocalDonationAlertsEvents();
+      showDonationAlertsStatusModal("success", "Соединение с DonationAlerts восстановлено");
+    }).catch(function (restoreError) {
+      if (restoreError && (restoreError.status === 400 || restoreError.status === 401)) {
+        console.error("DonationAlerts saved token restore failed after backend restart.", restoreError);
+        removeSavedDonationAlertsTokens();
+        showDonationAlertsTokenPanelAfterAuthLoss();
+        return;
+      }
+
+      console.warn("DonationAlerts saved token restore could not confirm token loss; keeping EventSource reconnect active.", restoreError);
+    });
+  }
+
+  function showDonationAlertsTokenPanelAfterAuthLoss() {
+    if (state.donationAlerts.events && typeof state.donationAlerts.events.close === "function") {
+      state.donationAlerts.events.close();
+    }
+
+    showDonationAlertsTokenPanel();
   }
 
   async function donationAlertsProxyRequest(path, options) {

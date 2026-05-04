@@ -383,6 +383,88 @@ vm.runInNewContext(
     "client does not ask for relogin when auth probe fails without a 401"
   );
 
+  var authPanelCountBeforeBackendRestart = createdElements.filter(function (element) {
+    return element.className === "donation-auth-panel";
+  }).length;
+  var activeEventSourceBeforeBackendRestart = context.window.RouletteApp.state.donationAlerts.events;
+  var eventSourceCountBeforeBackendRestart = eventSources.length;
+  storedValues.donationAlertsAccessToken = "saved-after-restart-token";
+  storedValues.donationAlertsRefreshToken = "saved-after-restart-refresh-token";
+  context.window.fetch = function (url, options) {
+    fetchCalls.push({
+      url,
+      options
+    });
+
+    if (url === "/api/donationalerts/auth") {
+      return Promise.resolve({
+        ok: false,
+        status: 401,
+        json: function () {
+          return Promise.resolve({ error: "server memory is empty" });
+        }
+      });
+    }
+
+    if (url === "/api/donationalerts/token") {
+      return Promise.resolve({
+        ok: true,
+        json: function () {
+          return Promise.resolve({
+            ok: true,
+            accessToken: "restored-backend-token",
+            refreshToken: "restored-backend-refresh-token",
+            expiresIn: 3600
+          });
+        }
+      });
+    }
+
+    return Promise.resolve({
+      ok: false,
+      status: 404,
+      json: function () {
+        return Promise.resolve({});
+      }
+    });
+  };
+  activeEventSourceBeforeBackendRestart.listeners.error();
+  await flushPromises();
+
+  assert.strictEqual(
+    createdElements.filter(function (element) {
+      return element.className === "donation-auth-panel";
+    }).length,
+    authPanelCountBeforeBackendRestart,
+    "client does not ask for relogin when backend restarts with saved tokens"
+  );
+  assert.strictEqual(
+    activeEventSourceBeforeBackendRestart.closed,
+    true,
+    "client closes stale EventSource after restoring backend memory"
+  );
+  assert.strictEqual(
+    eventSources.length,
+    eventSourceCountBeforeBackendRestart + 1,
+    "client opens a fresh EventSource after restoring backend memory"
+  );
+  assert.strictEqual(
+    fetchCalls[fetchCalls.length - 1].url,
+    "/api/donationalerts/token",
+    "client restores saved token to backend after restart"
+  );
+  assert.deepStrictEqual(JSON.parse(fetchCalls[fetchCalls.length - 1].options.body), {
+    accessToken: "saved-after-restart-token",
+    refreshToken: "saved-after-restart-refresh-token",
+    clientId: "18762",
+    clientSecret: "client-secret"
+  });
+  assert.strictEqual(
+    storedValues.donationAlertsAccessToken,
+    "restored-backend-token",
+    "client keeps token storage synced after backend restart restore"
+  );
+
   context.window.fetch = function () {
     return Promise.resolve({
       ok: false,
