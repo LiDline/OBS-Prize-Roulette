@@ -63,6 +63,9 @@ const context = {
           remove: function () {
             this.removed = true;
           },
+          setAttribute: function (name, value) {
+            this[name] = String(value);
+          },
           addEventListener: function (eventName, callback) {
             this["on" + eventName] = callback;
           }
@@ -417,6 +420,9 @@ vm.runInNewContext(
   var helpLink = createdElements.find(function (element) {
     return element.tagName === "A" && element.textContent === "тут";
   });
+  var visibilityButtons = createdElements.filter(function (element) {
+    return element.tagName === "BUTTON" && element.className === "donation-auth-visibility-toggle";
+  });
 
   assert.ok(authPanel, "client shows DonationAlerts token panel when auth fails");
   assert.ok(errorStatusModal, "client shows error modal after DonationAlerts login fails");
@@ -429,11 +435,24 @@ vm.runInNewContext(
   timeoutCalls[3].callback();
   assert.strictEqual(errorStatusModalPanel.removed, true, "client closes DonationAlerts error modal after 3 seconds");
   assert.strictEqual(panelInputs[0].value, "18762", "token panel restores saved application id");
+  assert.strictEqual(panelInputs[0].type, "password", "token panel masks saved application id");
   assert.strictEqual(panelInputs[0].readOnly, false, "token panel lets the user edit application id");
   assert.strictEqual(panelInputs[1].value, "client-secret", "token panel restores saved client secret");
+  assert.strictEqual(panelInputs[1].type, "password", "token panel masks saved client secret");
   assert.strictEqual(panelInputs[1].readOnly, false, "token panel lets the user edit client secret");
   assert.strictEqual(panelInputs[2].value, "http://127.0.0.1:3000/", "token panel shows redirect url");
   assert.strictEqual(panelInputs[2].readOnly, true, "token panel keeps redirect url read-only");
+  assert.strictEqual(visibilityButtons.length, 2, "token panel shows visibility toggles for saved credentials");
+  assert.strictEqual(visibilityButtons[0].type, "button", "application id visibility toggle does not submit the form");
+  assert.strictEqual(visibilityButtons[0].textContent, "👁", "application id visibility toggle uses an eye icon");
+  assert.strictEqual(visibilityButtons[0].title, "Показать ID приложения", "application id visibility toggle explains its action");
+  visibilityButtons[0].onclick();
+  assert.strictEqual(panelInputs[0].type, "text", "application id visibility toggle reveals masked value");
+  assert.strictEqual(visibilityButtons[0].title, "Скрыть ID приложения", "application id visibility toggle title changes after reveal");
+  visibilityButtons[0].onclick();
+  assert.strictEqual(panelInputs[0].type, "password", "application id visibility toggle masks value again");
+  visibilityButtons[1].onclick();
+  assert.strictEqual(panelInputs[1].type, "text", "client secret visibility toggle reveals masked value");
   assert.ok(helpTrigger, "token panel shows application id help trigger");
   assert.ok(helpTooltip, "token panel includes application id help tooltip");
   assert.strictEqual(

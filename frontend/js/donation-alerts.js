@@ -236,9 +236,11 @@
     var clientHelpLink;
     var clientHelpTextAfterLink;
     var clientInput;
+    var clientInputControl;
     var secretRow;
     var secretLabel;
     var secretInput;
+    var secretInputControl;
     var redirectRow;
     var redirectLabel;
     var redirectInput;
@@ -286,23 +288,25 @@
     clientHelp.appendChild(clientHelpTooltip);
     clientInput = doc.createElement("input");
     clientInput.id = "donation-alerts-client-id";
-    clientInput.type = "text";
+    clientInput.type = "password";
     clientInput.value = readSavedDonationAlertsApplicationId();
+    clientInputControl = createDonationAlertsSecretInputControl(doc, clientInput, "ID приложения");
     clientHeader.appendChild(clientLabel);
     clientHeader.appendChild(clientHelp);
     clientRow.appendChild(clientHeader);
-    clientRow.appendChild(clientInput);
+    clientRow.appendChild(clientInputControl);
     panel.appendChild(clientRow);
 
-    secretRow = doc.createElement("label");
+    secretRow = doc.createElement("div");
     secretRow.className = "donation-auth-row";
     secretLabel = doc.createElement("span");
     secretLabel.textContent = "Ключ API";
     secretInput = doc.createElement("input");
-    secretInput.type = "text";
+    secretInput.type = "password";
     secretInput.value = readSavedDonationAlertsClientSecret();
+    secretInputControl = createDonationAlertsSecretInputControl(doc, secretInput, "Ключ API");
     secretRow.appendChild(secretLabel);
-    secretRow.appendChild(secretInput);
+    secretRow.appendChild(secretInputControl);
     panel.appendChild(secretRow);
 
     redirectRow = doc.createElement("label");
@@ -334,6 +338,31 @@
 
     doc.body.appendChild(panel);
     state.donationAlerts.authPanel = panel;
+  }
+
+  function createDonationAlertsSecretInputControl(doc, input, label) {
+    var control = doc.createElement("div");
+    var toggle = doc.createElement("button");
+
+    control.className = "donation-auth-secret-control";
+    toggle.className = "donation-auth-visibility-toggle";
+    toggle.type = "button";
+    toggle.textContent = "👁";
+    toggle.title = "Показать " + label;
+    toggle.setAttribute("aria-label", "Показать " + label);
+
+    toggle.addEventListener("click", function () {
+      var revealed = input.type === "password";
+
+      input.type = revealed ? "text" : "password";
+      toggle.title = (revealed ? "Скрыть " : "Показать ") + label;
+      toggle.setAttribute("aria-label", toggle.title);
+    });
+
+    control.appendChild(input);
+    control.appendChild(toggle);
+
+    return control;
   }
 
   function showDonationAlertsStatusModal(type, message) {
